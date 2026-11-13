@@ -1,0 +1,309 @@
+{% extends 'base.html' %}
+
+{% block title %}Đồng Hồ Pomodoro — StudyPlanner AI{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto space-y-6" x-data="pomodoroApp({{ user.pomodoro_work_minutes }}, {{ user.pomodoro_break_minutes }}, {{ user.pomodoro_long_break_minutes }})">
+
+    <!-- Thanh điều hướng trên -->
+    <div class="flex items-center justify-between">
+        <a href="{% url 'dashboard' %}" class="inline-flex items-center text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
+            <i data-lucide="arrow-left" class="w-4 h-4 mr-1.5"></i> Quay lại Thời khóa biểu
+        </a>
+        <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/25 text-rose-600 dark:text-rose-400 text-xs font-semibold">
+            <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+            <span>Không gian tập trung</span>
+        </div>
+    </div>
+
+    <!-- Khối đồng hồ đếm ngược -->
+    <div class="bg-white dark:bg-[#131926] rounded-3xl p-6 sm:p-10 border border-slate-200/80 dark:border-[#232B3E] shadow-sm flex flex-col items-center space-y-8 relative overflow-hidden transition-all">
+        
+        <!-- Chuyển đổi chế độ đếm giờ (Sentence case tự nhiên) -->
+        <div class="flex items-center space-x-1.5 p-1.5 bg-slate-100 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-2xl text-xs font-semibold z-10">
+            <button @click="setMode('work')" 
+                    :class="mode === 'work' ? 'bg-white dark:bg-[#1E2638] text-rose-600 dark:text-rose-400 shadow-sm border border-slate-200/60 dark:border-rose-500/30' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'"
+                    class="px-4 py-2 rounded-xl transition-all flex items-center space-x-1.5">
+                <i data-lucide="brain" class="w-4 h-4"></i>
+                <span>Tập trung ({{ user.pomodoro_work_minutes }} phút)</span>
+            </button>
+            <button @click="setMode('shortBreak')" 
+                    :class="mode === 'shortBreak' ? 'bg-white dark:bg-[#1E2638] text-emerald-600 dark:text-emerald-400 shadow-sm border border-slate-200/60 dark:border-emerald-500/30' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'"
+                    class="px-4 py-2 rounded-xl transition-all flex items-center space-x-1.5">
+                <i data-lucide="coffee" class="w-4 h-4"></i>
+                <span>Nghỉ ngắn ({{ user.pomodoro_break_minutes }} phút)</span>
+            </button>
+            <button @click="setMode('longBreak')" 
+                    :class="mode === 'longBreak' ? 'bg-white dark:bg-[#1E2638] text-blue-600 dark:text-blue-300 shadow-sm border border-slate-200/60 dark:border-blue-500/30' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'"
+                    class="px-4 py-2 rounded-xl transition-all flex items-center space-x-1.5">
+                <i data-lucide="sparkles" class="w-4 h-4"></i>
+                <span>Nghỉ dài ({{ user.pomodoro_long_break_minutes }} phút)</span>
+            </button>
+        </div>
+
+        <!-- Chọn công việc gắn kết -->
+        <div class="w-full max-w-sm z-10 space-y-1.5">
+            <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Bạn đang học môn hoặc công việc nào?</label>
+            <select x-model="selectedTaskId" class="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-xs font-medium text-slate-800 dark:text-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-center focus:outline-none transition-all">
+                <option value="">-- Học tự do (Không liên kết công việc) --</option>
+                {% for t in pending_tasks %}
+                <option value="{{ t.id }}" {% if selected_task and selected_task.id == t.id %}selected{% endif %}>
+                    [{{ t.course.name }}] {{ t.title }} (Còn {{ t.remaining_minutes }} phút)
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Vòng tròn hiển thị đồng hồ SVG -->
+        <div class="relative w-64 h-64 sm:w-72 sm:h-72 flex items-center justify-center">
+            <svg class="w-full h-full transform -rotate-90">
+                <circle cx="50%" cy="50%" r="42%" stroke="currentColor" class="text-slate-100 dark:text-[#1A2234]" stroke-width="10" fill="transparent" />
+                <circle cx="50%" cy="50%" r="42%" 
+                        :stroke="mode === 'work' ? '#F43F5E' : (mode === 'shortBreak' ? '#10B981' : '#2563EB')"
+                        stroke-width="10" 
+                        stroke-linecap="round"
+                        fill="transparent" 
+                        stroke-dasharray="264"
+                        :stroke-dashoffset="dashOffset"
+                        class="transition-all duration-1000 ease-linear" />
+            </svg>
+
+            <!-- Thời gian số -->
+            <div class="absolute inset-0 flex flex-col items-center justify-center space-y-1">
+                <div class="text-5xl sm:text-6xl font-black font-mono tracking-tighter text-slate-900 dark:text-white" x-text="formattedTime">
+                    25:00
+                </div>
+                <div class="text-xs font-semibold text-slate-500 dark:text-slate-400" x-text="modeLabel">
+                    Tập trung học tập
+                </div>
+            </div>
+        </div>
+
+        <!-- Các nút bấm điều khiển -->
+        <div class="flex items-center space-x-4 z-10">
+            <!-- Nút Bắt đầu / Tạm dừng -->
+            <button @click="toggleTimer()" 
+                    class="w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-md transition-all active:scale-95"
+                    :class="mode === 'work' ? 'bg-rose-600 hover:bg-rose-700' : (mode === 'shortBreak' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700')">
+                <i data-lucide="play" class="w-6 h-6 fill-white" x-show="!isRunning"></i>
+                <i data-lucide="pause" class="w-6 h-6 fill-white" x-show="isRunning" style="display: none;"></i>
+            </button>
+
+            <!-- Nút Đặt lại -->
+            <button @click="resetTimer()" title="Đặt lại đồng hồ"
+                    class="w-12 h-12 rounded-xl bg-slate-100 dark:bg-[#1A2234] hover:bg-slate-200 dark:hover:bg-[#232E45] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-[#283248] flex items-center justify-center transition-colors">
+                <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+            </button>
+
+            <!-- Hoàn thành sớm -->
+            <button @click="completeSessionEarly()" title="Hoàn thành phiên để ghi nhận vào tiến độ"
+                    class="px-4 py-3 rounded-xl bg-slate-100 dark:bg-[#1A2234] hover:bg-slate-200 dark:hover:bg-[#232E45] text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-[#283248] text-xs font-semibold flex items-center space-x-2 transition-colors">
+                <i data-lucide="check-circle" class="w-4 h-4 text-emerald-500"></i>
+                <span>Ghi nhận hoàn thành</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal đánh giá phiên học -->
+    <div x-show="ratingModal.show" 
+         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm"
+         style="display: none;">
+        <div class="bg-white dark:bg-[#131926] rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 dark:border-[#232B3E] space-y-4 text-center">
+            <div class="w-14 h-14 rounded-2xl bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 text-rose-600 dark:text-rose-400 mx-auto flex items-center justify-center">
+                <i data-lucide="trophy" class="w-7 h-7"></i>
+            </div>
+            
+            <div class="space-y-1">
+                <h3 class="text-base font-bold text-slate-900 dark:text-white">Hoàn thành phiên học! 🎉</h3>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Đánh giá mức độ hiệu quả để theo dõi thói quen.</p>
+            </div>
+
+            <!-- Xếp hạng 5 sao -->
+            <div class="flex items-center justify-center space-x-1.5 py-1">
+                <template x-for="star in [1, 2, 3, 4, 5]" :key="star">
+                    <button type="button" @click="ratingModal.score = star" class="p-1 transition-transform hover:scale-125 focus:outline-none">
+                        <i data-lucide="star" class="w-7 h-7"
+                           :class="star <= ratingModal.score ? 'fill-amber-400 text-amber-400' : 'text-slate-200 dark:text-slate-700'"></i>
+                    </button>
+                </template>
+            </div>
+
+            <input type="text" x-model="ratingModal.notes" placeholder="Ghi chú nhanh về buổi học..."
+                   class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-xs text-slate-900 dark:text-white focus:border-blue-500 focus:outline-none">
+
+            <button type="button" @click="submitSession()"
+                    class="w-full py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs shadow-sm transition-all">
+                Lưu kết quả học tập
+            </button>
+        </div>
+    </div>
+
+    <!-- Lịch sử các phiên học gần đây -->
+    <div class="bg-white dark:bg-[#131926] rounded-3xl p-5 sm:p-6 border border-slate-200/80 dark:border-[#232B3E] shadow-sm space-y-3.5 transition-all">
+        <h3 class="font-bold text-xs text-slate-700 dark:text-slate-300 flex items-center">
+            <i data-lucide="history" class="w-4 h-4 mr-2 text-slate-400"></i> Lịch sử học tập gần đây
+        </h3>
+
+        <div class="divide-y divide-slate-100 dark:divide-[#1E2638]">
+            {% for s in recent_sessions %}
+            <div class="py-3 flex items-center justify-between text-xs">
+                <div class="space-y-0.5">
+                    <div class="flex items-center space-x-2">
+                        <span class="font-semibold text-slate-900 dark:text-white">
+                            {% if s.task %}{{ s.task.title }}{% else %}Tập trung tự do{% endif %}
+                        </span>
+                        <span class="text-[11px] bg-slate-100 dark:bg-[#1A2234] border border-slate-200 dark:border-[#283248] text-slate-600 dark:text-slate-400 font-mono px-2 py-0.5 rounded-full">
+                            {{ s.duration_minutes }} phút
+                        </span>
+                    </div>
+                    {% if s.notes %}
+                    <p class="text-[11px] text-slate-500 dark:text-slate-400 italic">{{ s.notes }}</p>
+                    {% endif %}
+                </div>
+
+                <div class="flex items-center space-x-3 text-slate-500 dark:text-slate-400 font-mono text-[11px]">
+                    <span class="text-amber-500 font-semibold flex items-center">{{ s.efficiency_score }}⭐</span>
+                    <span>{{ s.start_datetime|date:"d/m H:i" }}</span>
+                </div>
+            </div>
+            {% empty %}
+            <div class="py-6 text-center text-xs text-slate-400 dark:text-slate-500">Chưa có phiên học nào được ghi lại.</div>
+            {% endfor %}
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function pomodoroApp(workMin, breakMin, longBreakMin) {
+        return {
+            mode: 'work',
+            workDuration: workMin * 60,
+            breakDuration: breakMin * 60,
+            longBreakDuration: longBreakMin * 60,
+            timeLeft: workMin * 60,
+            totalDuration: workMin * 60,
+            isRunning: false,
+            timerId: null,
+            selectedTaskId: '{{ selected_task.id|default:"" }}',
+            ratingModal: { show: false, score: 5, notes: '' },
+
+            get formattedTime() {
+                const m = Math.floor(this.timeLeft / 60).toString().padStart(2, '0');
+                const s = (this.timeLeft % 60).toString().padStart(2, '0');
+                return `${m}:${s}`;
+            },
+
+            get modeLabel() {
+                if (this.mode === 'work') return 'Tập trung học tập';
+                if (this.mode === 'shortBreak') return 'Nghỉ ngơi ngắn';
+                return 'Nghỉ ngơi dài';
+            },
+
+            get dashOffset() {
+                const progress = (this.totalDuration - this.timeLeft) / this.totalDuration;
+                return 264 * (1 - progress);
+            },
+
+            setMode(m) {
+                this.pauseTimer();
+                this.mode = m;
+                if (m === 'work') this.totalDuration = this.workDuration;
+                else if (m === 'shortBreak') this.totalDuration = this.breakDuration;
+                else this.totalDuration = this.longBreakDuration;
+                this.timeLeft = this.totalDuration;
+            },
+
+            toggleTimer() {
+                if (this.isRunning) {
+                    this.pauseTimer();
+                } else {
+                    this.startTimer();
+                }
+            },
+
+            startTimer() {
+                this.isRunning = true;
+                if ('Notification' in window && Notification.permission === 'default') {
+                    Notification.requestPermission();
+                }
+                this.timerId = setInterval(() => {
+                    if (this.timeLeft > 0) {
+                        this.timeLeft--;
+                    } else {
+                        this.timerFinished();
+                    }
+                }, 1000);
+            },
+
+            pauseTimer() {
+                this.isRunning = false;
+                if (this.timerId) clearInterval(this.timerId);
+            },
+
+            resetTimer() {
+                this.pauseTimer();
+                this.timeLeft = this.totalDuration;
+            },
+
+            completeSessionEarly() {
+                this.pauseTimer();
+                this.timerFinished();
+            },
+
+            timerFinished() {
+                this.pauseTimer();
+                window.playChimeSound();
+                confetti({ particleCount: 80, spread: 55, origin: { y: 0.7 } });
+
+                if ('Notification' in window && Notification.permission === 'granted') {
+                    new Notification("Hoàn thành phiên học!", {
+                        body: this.mode === 'work' ? "Tuyệt vời! Bạn đã hoàn thành phiên tập trung." : "Hết giờ nghỉ! Sẵn sàng quay lại học nhé.",
+                        icon: "https://cdn-icons-png.flaticon.com/512/3247/3247295.png"
+                    });
+                }
+
+                if (this.mode === 'work') {
+                    this.ratingModal.show = true;
+                    setTimeout(() => lucide.createIcons(), 40);
+                } else {
+                    alert("Hết giờ nghỉ ngơi! Bắt đầu phiên làm việc tiếp theo.");
+                    this.setMode('work');
+                }
+            },
+
+            async submitSession() {
+                const spentMinutes = Math.max(Math.round((this.totalDuration - this.timeLeft) / 60), 1);
+                const actualMinutes = spentMinutes > 0 ? spentMinutes : Math.round(this.totalDuration / 60);
+
+                if (this.selectedTaskId) {
+                    try {
+                        const res = await fetch(`/api/v1/tasks/${this.selectedTaskId}/pomodoro-complete`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': '{{ csrf_token }}'
+                            },
+                            body: JSON.stringify({
+                                duration_minutes: actualMinutes,
+                                efficiency_score: this.ratingModal.score,
+                                notes: this.ratingModal.notes
+                            })
+                        });
+                        if (res.ok) {
+                            window.location.reload();
+                            return;
+                        }
+                    } catch (e) {
+                        console.error("Error logging pomodoro:", e);
+                    }
+                }
+                this.ratingModal.show = false;
+                this.setMode('shortBreak');
+            }
+        };
+    }
+</script>
+{% endblock %}

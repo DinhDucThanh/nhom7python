@@ -1,0 +1,129 @@
+{% extends 'base.html' %}
+
+{% block title %}Cài Đặt Hồ Sơ & Cấu Hình Học Tập — StudyPlanner AI{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-6">
+    
+    <!-- Top Action Bar -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white flex items-center">
+                <i data-lucide="settings" class="w-5 h-5 mr-2.5 text-brand-600"></i>
+                Hồ Sơ & Cấu Hình Học Tập
+            </h1>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Tùy biến giờ sinh học, bộ đếm Pomodoro và OpenAI API Key</p>
+        </div>
+        <span class="px-3 py-1 rounded-full text-xs font-bold bg-brand-50 dark:bg-brand-500/10 border border-brand-200 dark:border-brand-500/20 text-brand-700 dark:text-brand-300 font-mono">
+            {{ user.get_role_display }}
+        </span>
+    </div>
+
+    <form method="POST" action="{% url 'profile' %}" class="space-y-5 text-xs">
+        {% csrf_token %}
+
+        <!-- Card 1: User Info -->
+        <div class="bg-white dark:bg-[#131926] p-5 sm:p-6 rounded-2xl border border-slate-200/80 dark:border-[#232B3E] shadow-sm space-y-4 transition-all">
+            <h2 class="text-xs font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500">Thông tin cơ bản</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">Tên đăng nhập</label>
+                    <input type="text" value="{{ user.username }}" disabled
+                           class="w-full px-3.5 py-2 bg-slate-100 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#1E2638] rounded-xl text-xs text-slate-400 cursor-not-allowed">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">Email</label>
+                    <input name="email" type="email" value="{{ user.email }}" required
+                           class="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-xs text-slate-900 dark:text-white focus:border-brand-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">Họ & Tên đệm</label>
+                    <input name="last_name" type="text" value="{{ user.last_name }}"
+                           class="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-xs text-slate-900 dark:text-white focus:border-brand-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">Tên</label>
+                    <input name="first_name" type="text" value="{{ user.first_name }}"
+                           class="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-xs text-slate-900 dark:text-white focus:border-brand-500 focus:outline-none">
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 2: Study Hours -->
+        <div class="bg-white dark:bg-[#131926] p-5 sm:p-6 rounded-2xl border border-slate-200/80 dark:border-[#232B3E] shadow-sm space-y-4 transition-all">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-xs font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500">Khung giờ sinh học trong ngày</h2>
+                    <p class="text-[11px] text-slate-500 dark:text-slate-400">Thuật toán xếp lịch chỉ phân bổ các phiên học trong khoảng thời gian này</p>
+                </div>
+                <span class="text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-[#1A2234] border border-slate-200 dark:border-[#283248] text-slate-600 dark:text-slate-400">08:00 - 22:00</span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">Bắt đầu học sáng</label>
+                    <input name="study_start_hour" type="time" value="{{ user.study_start_hour|time:'H:i' }}" required
+                           class="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-xs text-slate-900 dark:text-white focus:border-brand-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">Kết thúc học tối</label>
+                    <input name="study_end_hour" type="time" value="{{ user.study_end_hour|time:'H:i' }}" required
+                           class="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-xs text-slate-900 dark:text-white focus:border-brand-500 focus:outline-none">
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 3: Pomodoro Durations -->
+        <div class="bg-white dark:bg-[#131926] p-5 sm:p-6 rounded-2xl border border-slate-200/80 dark:border-[#232B3E] shadow-sm space-y-4 transition-all">
+            <h2 class="text-xs font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500">Cấu hình Pomodoro (phút)</h2>
+            <div class="grid grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">Tập trung</label>
+                    <input name="pomodoro_work_minutes" type="number" min="10" max="90" value="{{ user.pomodoro_work_minutes }}" required
+                           class="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-xs text-slate-900 dark:text-white focus:border-brand-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">Nghỉ ngắn</label>
+                    <input name="pomodoro_break_minutes" type="number" min="2" max="30" value="{{ user.pomodoro_break_minutes }}" required
+                           class="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-xs text-slate-900 dark:text-white focus:border-brand-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">Nghỉ dài</label>
+                    <input name="pomodoro_long_break_minutes" type="number" min="5" max="60" value="{{ user.pomodoro_long_break_minutes }}" required
+                           class="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-xs text-slate-900 dark:text-white focus:border-brand-500 focus:outline-none">
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 4: Generative AI Key -->
+        <div class="bg-white dark:bg-[#131926] p-5 sm:p-6 rounded-2xl border border-slate-200/80 dark:border-[#232B3E] shadow-sm space-y-3 transition-all">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-xs font-extrabold uppercase tracking-wider text-brand-600 dark:text-brand-300 flex items-center">
+                        <i data-lucide="sparkles" class="w-4 h-4 mr-1.5 text-brand-600"></i> Mô hình Ngôn ngữ Lớn (Generative AI)
+                    </h2>
+                    <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Kích hoạt GPT-4o-mini phân tích suy luận ngữ nghĩa thời gian thực</p>
+                </div>
+                <span class="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-brand-50 dark:bg-brand-500/20 border border-brand-200 dark:border-brand-500/30 text-brand-600 dark:text-brand-300 font-bold">Tùy chọn</span>
+            </div>
+
+            <div>
+                <input name="openai_api_key" type="password" value="{{ user.openai_api_key|default:'' }}" placeholder="sk-proj-..."
+                       class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-xs text-slate-900 dark:text-white focus:border-brand-500 focus:outline-none font-mono">
+                <p class="text-[11px] text-slate-400 dark:text-slate-500 mt-1.5 italic">
+                    💡 Nếu để trống, hệ thống tự động sử dụng Semantic Expert System nội bộ dựa trên dữ liệu thật.
+                </p>
+            </div>
+        </div>
+
+        <div class="flex justify-end space-x-2.5 pt-2">
+            <a href="{% url 'dashboard' %}" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-[#1A2234] hover:bg-slate-200 dark:hover:bg-[#283248] text-slate-700 dark:text-slate-300 text-xs font-bold transition-all">
+                Hủy
+            </a>
+            <button type="submit" class="px-5 py-2 rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 text-white text-xs font-bold shadow-md shadow-brand-500/20 transition-all active:scale-95">
+                Lưu cài đặt
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

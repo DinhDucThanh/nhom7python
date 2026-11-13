@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="vi" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Lập Kế Hoạch Học Tập & Tối Ưu Lịch — StudyPlanner{% endblock %}</title>
+
+    <!-- Google Font: Be Vietnam Pro (Thiết kế chuẩn hóa hiển thị tiếng Việt & Typographic Hierarchy) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Be Vietnam Pro"', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'monospace'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            200: '#bfdbfe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Khởi tạo Theme Sáng / Tối lưu trong LocalStorage -->
+    <script>
+        (function() {
+            const savedTheme = localStorage.getItem('studyplanner_theme');
+            if (savedTheme === 'dark') {
+                document.documentElement.classList.add('dark');
+            } else if (savedTheme === 'light') {
+                document.documentElement.classList.remove('dark');
+            } else {
+                // Mặc định giao diện Sáng thoáng đãng, dễ chịu cho mắt
+                document.documentElement.classList.remove('dark');
+            }
+        })();
+    </script>
+
+    <!-- HTMX CDN -->
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+
+    <!-- Alpine.js CDN -->
+    <script defer src="https://unpkg.com/alpinejs@3.13.10/dist/cdn.min.js"></script>
+
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- FullCalendar CSS/JS CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+
+    <!-- Canvas Confetti CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+
+    <style>
+        /* CSS Tokens Tuân thủ Nguyên tắc Frontend Design */
+        :root {
+            --app-bg: #F8FAFC;
+            --card-bg: #FFFFFF;
+            --card-border: #E2E8F0;
+            --card-hover: #F1F5F9;
+            --text-heading: #0F172A;
+            --text-body: #334155;
+            --text-muted: #64748B;
+            
+            --fc-border-color: #F1F5F9;
+            --fc-page-bg-color: #FFFFFF;
+            --fc-today-bg-color: #F8FAFC;
+            --fc-neutral-bg-color: #F8FAFC;
+        }
+
+        html.dark {
+            --app-bg: #0B0F17;
+            --card-bg: #131926;
+            --card-border: #232B3E;
+            --card-hover: #1A2234;
+            --text-heading: #F8FAFC;
+            --text-body: #CBD5E1;
+            --text-muted: #94A3B8;
+
+            --fc-border-color: #1E2638;
+            --fc-page-bg-color: #131926;
+            --fc-today-bg-color: #161F30;
+            --fc-neutral-bg-color: #0E131F;
+        }
+
+        body {
+            font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--app-bg);
+            color: var(--text-body);
+            transition: background-color 0.2s ease, color 0.2s ease;
+        }
+
+        /* FullCalendar Tinh giản & Tự nhiên */
+        .fc {
+            --fc-border-color: var(--fc-border-color);
+            --fc-page-bg-color: var(--fc-page-bg-color);
+            --fc-today-bg-color: var(--fc-today-bg-color);
+            --fc-now-indicator-color: #2563EB;
+        }
+
+        .fc .fc-toolbar {
+            margin-bottom: 1.25rem !important;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .fc .fc-toolbar-title {
+            font-size: 1.15rem !important;
+            font-weight: 700 !important;
+            color: var(--text-heading) !important;
+            letter-spacing: -0.015em;
+        }
+
+        /* Nút điều hướng lịch tuần tự nhiên */
+        .fc .fc-button-primary {
+            background-color: var(--card-bg) !important;
+            border-color: var(--card-border) !important;
+            color: var(--text-body) !important;
+            border-radius: 0.75rem !important;
+            font-weight: 600 !important;
+            font-size: 0.8125rem !important;
+            padding: 0.45rem 0.85rem !important;
+            text-transform: none !important;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+            transition: all 0.15s ease-in-out;
+        }
+
+        .fc .fc-button-primary:hover {
+            background-color: var(--card-hover) !important;
+            color: var(--text-heading) !important;
+            border-color: #CBD5E1 !important;
+        }
+
+        html.dark .fc .fc-button-primary:hover {
+            border-color: #384258 !important;
+        }
+
+        .fc .fc-button-primary.fc-button-active {
+            background-color: #2563EB !important;
+            border-color: #2563EB !important;
+            color: #FFFFFF !important;
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25) !important;
+        }
+
+        .fc-theme-standard td, .fc-theme-standard th {
+            border-color: var(--fc-border-color) !important;
+        }
+
+        .fc-col-header-cell {
+            background-color: var(--app-bg) !important;
+            padding: 8px 0 !important;
+            border-bottom: 2px solid var(--fc-border-color) !important;
+        }
+
+        .fc-col-header-cell-cushion {
+            font-size: 12px !important;
+            font-weight: 600 !important;
+            color: var(--text-muted) !important;
+            text-transform: none !important;
+            letter-spacing: normal !important;
+        }
+
+        .fc-timegrid-slot-label-cushion {
+            font-size: 11px !important;
+            font-weight: 500 !important;
+            color: var(--text-muted) !important;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .fc-timegrid-slot {
+            height: 2.35rem !important;
+        }
+
+        .fc-now-indicator-line {
+            border-color: #2563EB !important;
+            border-width: 2px !important;
+        }
+
+        .fc-now-indicator-arrow {
+            border-color: #2563EB !important;
+        }
+
+        /* Thẻ sự kiện học tập trên lịch */
+        .fc-event {
+            border-radius: 10px !important;
+            padding: 3px 6px !important;
+            cursor: pointer;
+            border: 1px solid rgba(0, 0, 0, 0.06) !important;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05) !important;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        html.dark .fc-event {
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4) !important;
+        }
+
+        .fc-event:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+        }
+
+        .fc-event-main {
+            font-size: 11.5px !important;
+            font-weight: 600 !important;
+            line-height: 1.35 !important;
+        }
+
+        .fc-busy-slot {
+            background: repeating-linear-gradient(
+                -45deg,
+                #F1F5F9,
+                #F1F5F9 8px,
+                #E2E8F0 8px,
+                #E2E8F0 16px
+            ) !important;
+            border-left: 4px solid #64748B !important;
+            color: #334155 !important;
+        }
+
+        html.dark .fc-busy-slot {
+            background: repeating-linear-gradient(
+                -45deg,
+                #131926,
+                #131926 8px,
+                #1A2234 8px,
+                #1A2234 16px
+            ) !important;
+            border-left: 4px solid #475569 !important;
+            color: #CBD5E1 !important;
+        }
+
+        /* Thanh cuộn tinh tế */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #CBD5E1;
+            border-radius: 9999px;
+        }
+        html.dark ::-webkit-scrollbar-thumb {
+            background: #232B3E;
+        }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="h-full flex flex-col bg-[#F8FAFC] dark:bg-[#0B0F17] text-slate-700 dark:text-slate-300 antialiased selection:bg-brand-500 selection:text-white">
+
+    {% if user.is_authenticated %}
+    <!-- THANH ĐIỀU HƯỚNG TRANG (NAVIGATION BAR) -->
+    <header class="bg-white/90 dark:bg-[#131926]/90 backdrop-blur-md border-b border-slate-200/80 dark:border-[#232B3E] sticky top-0 z-40 flex-shrink-0 transition-colors">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                
+                <!-- Logo & Thương hiệu -->
+                <div class="flex items-center space-x-8">
+                    <a href="{% url 'dashboard' %}" class="flex items-center space-x-3 group">
+                        <div class="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-sm group-hover:bg-blue-700 transition-colors">
+                            <i data-lucide="calendar" class="w-4.5 h-4.5"></i>
+                        </div>
+                        <div class="flex flex-col">
+                            <div class="flex items-center space-x-1.5">
+                                <span class="font-bold text-slate-900 dark:text-white text-base tracking-tight">StudyPlanner</span>
+                                <span class="text-[10px] font-semibold text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-500/20 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-500/30">AI</span>
+                            </div>
+                            <span class="text-[11px] text-slate-500 dark:text-slate-400">Lịch học cá nhân</span>
+                        </div>
+                    </a>
+
+                    <!-- Danh mục chức năng (Dùng câu chữ tự nhiên, không All-caps) -->
+                    <nav class="hidden md:flex items-center space-x-1">
+                        <a href="{% url 'dashboard' %}" 
+                           class="flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all {% if request.path == '/' or request.path == '/calendar/' %}bg-slate-100 dark:bg-[#1E2638] text-blue-600 dark:text-white{% else %}text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#1A2234]{% endif %}">
+                            <i data-lucide="layout-grid" class="w-4 h-4"></i>
+                            <span>Lịch tuần</span>
+                        </a>
+
+                        <a href="{% url 'pomodoro' %}" 
+                           class="flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all {% if 'pomodoro' in request.path %}bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-500/20{% else %}text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#1A2234]{% endif %}">
+                            <i data-lucide="timer" class="w-4 h-4 text-rose-500"></i>
+                            <span>Đồng hồ Pomodoro</span>
+                        </a>
+
+                        <a href="{% url 'courses' %}" 
+                           class="flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all {% if 'courses' in request.path %}bg-slate-100 dark:bg-[#1E2638] text-blue-600 dark:text-white{% else %}text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#1A2234]{% endif %}">
+                            <i data-lucide="book-open" class="w-4 h-4 text-slate-500"></i>
+                            <span>Môn học & Lịch bận</span>
+                        </a>
+
+                        {% if user.is_admin_role %}
+                        <a href="{% url 'admin_portal' %}" 
+                           class="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all {% if 'admin_portal' in request.path %}bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/20{% else %}text-amber-600/80 dark:text-amber-400/80 hover:text-amber-700 hover:bg-amber-50/50{% endif %}">
+                            <i data-lucide="shield-check" class="w-4 h-4"></i>
+                            <span>Quản trị người dùng</span>
+                        </a>
+                        {% endif %}
+                    </nav>
+                </div>
+
+                <!-- Thanh tác vụ bên phải -->
+                <div class="flex items-center space-x-3">
+                    
+                    <!-- Nút hành động chính duy nhất: Tự động xếp lịch -->
+                    <a href="{% url 'trigger_optimizer' %}" 
+                       title="Sắp xếp thông minh các phiên học vào khoảng trống trong tuần"
+                       class="inline-flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-sm transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500">
+                        <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-300"></i>
+                        <span>Tự động xếp lịch</span>
+                    </a>
+
+                    <!-- Nút chuyển đổi Giao diện Sáng / Tối (☀️ / 🌙) -->
+                    <button id="themeToggleBtn" onclick="toggleTheme()" 
+                            title="Chuyển đổi giao diện Sáng / Tối"
+                            class="p-2 rounded-xl text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#1A2234] hover:text-slate-900 dark:hover:text-white border border-slate-200/80 dark:border-[#232B3E] transition-all">
+                        <i data-lucide="sun" class="w-4 h-4 hidden dark:block text-amber-400"></i>
+                        <i data-lucide="moon" class="w-4 h-4 block dark:hidden text-slate-600"></i>
+                    </button>
+
+                    <!-- Hộp thông báo -->
+                    <div class="relative" x-data="{ open: false }">
+                        <button @click="open = !open" 
+                                class="relative p-2 rounded-xl text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#1A2234] hover:text-slate-900 dark:hover:text-white border border-slate-200/80 dark:border-[#232B3E] transition-all">
+                            <i data-lucide="bell" class="w-4 h-4"></i>
+                            {% if unread_notifications_count > 0 %}
+                            <span class="absolute top-1.5 right-1.5 flex h-2 w-2 rounded-full bg-rose-500 ring-2 ring-white dark:ring-[#131926]"></span>
+                            {% endif %}
+                        </button>
+
+                        <div x-show="open" 
+                             @click.away="open = false" 
+                             class="absolute right-0 mt-2 w-80 bg-white dark:bg-[#131926] rounded-2xl shadow-xl border border-slate-200 dark:border-[#232B3E] py-2 z-50 overflow-hidden"
+                             style="display: none;">
+                            <div class="flex items-center justify-between px-4 py-2 border-b border-slate-100 dark:border-[#1E2638]">
+                                <span class="font-bold text-xs text-slate-900 dark:text-white">Thông báo</span>
+                                <a href="{% url 'mark_notifications_read' %}" class="text-[11px] text-blue-600 dark:text-blue-300 hover:underline font-medium">Đã đọc tất cả</a>
+                            </div>
+                            <div class="max-h-60 overflow-y-auto divide-y divide-slate-100 dark:divide-[#1E2638]">
+                                {% if recent_notifications %}
+                                    {% for notif in recent_notifications %}
+                                    <div class="p-3.5 hover:bg-slate-50 dark:hover:bg-[#1A2234] transition-colors {% if not notif.is_read %}bg-blue-50/40 dark:bg-blue-500/5{% endif %}">
+                                        <div class="font-bold text-xs text-slate-900 dark:text-white">{{ notif.title }}</div>
+                                        <div class="text-[11px] text-slate-600 dark:text-slate-400 line-clamp-2 mt-0.5 leading-relaxed">{{ notif.message }}</div>
+                                        <div class="text-[10px] text-slate-400 dark:text-slate-500 mt-1">{{ notif.created_at|timesince }} trước</div>
+                                    </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <div class="p-6 text-center text-xs text-slate-400 dark:text-slate-500">Chưa có thông báo nào.</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Menu tài khoản cá nhân -->
+                    <div class="relative" x-data="{ open: false }">
+                        <button @click="open = !open" class="flex items-center space-x-2.5 p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-[#1A2234] border border-slate-200/80 dark:border-[#232B3E] transition-all">
+                            <div class="w-7 h-7 rounded-lg bg-blue-600 text-white font-bold flex items-center justify-center text-xs">
+                                {{ user.username|slice:":1"|upper }}
+                            </div>
+                            <span class="text-xs font-medium text-slate-700 dark:text-slate-200 hidden sm:inline">{{ user.username }}</span>
+                            <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400"></i>
+                        </button>
+
+                        <div x-show="open" 
+                             @click.away="open = false" 
+                             class="absolute right-0 mt-2 w-52 bg-white dark:bg-[#131926] rounded-2xl shadow-xl border border-slate-200 dark:border-[#232B3E] py-1.5 z-50 overflow-hidden text-xs"
+                             style="display: none;">
+                            <div class="px-4 py-2.5 border-b border-slate-100 dark:border-[#1E2638]">
+                                <div class="font-bold text-slate-900 dark:text-white truncate">{{ user.first_name }} {{ user.last_name|default:user.username }}</div>
+                                <div class="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">{{ user.get_role_display }}</div>
+                            </div>
+                            <a href="{% url 'profile' %}" class="flex items-center px-4 py-2.5 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2234] font-medium transition-colors">
+                                <i data-lucide="settings" class="w-4 h-4 mr-2.5 text-slate-400"></i> Cài đặt & API Key
+                            </a>
+                            <a href="{% url 'logout' %}" class="flex items-center px-4 py-2.5 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 font-semibold border-t border-slate-100 dark:border-[#1E2638] transition-colors">
+                                <i data-lucide="log-out" class="w-4 h-4 mr-2.5"></i> Đăng xuất
+                            </a>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+        </div>
+    </header>
+    {% endif %}
+
+    <!-- THÔNG BÁO FLASH MESSAGE -->
+    {% if messages %}
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 w-full">
+        {% for message in messages %}
+        <div class="flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-medium shadow-xs transition-all mb-2.5
+                    {% if message.tags == 'error' %}bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-500/25
+                    {% elif message.tags == 'warning' %}bg-amber-50 dark:bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/25
+                    {% elif message.tags == 'success' %}bg-emerald-50 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/25
+                    {% else %}bg-blue-50 dark:bg-blue-500/10 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-500/25{% endif %}">
+            <div class="flex items-center space-x-2.5">
+                {% if message.tags == 'error' %}<i data-lucide="alert-circle" class="w-4 h-4 text-rose-500"></i>
+                {% elif message.tags == 'warning' %}<i data-lucide="alert-triangle" class="w-4 h-4 text-amber-500"></i>
+                {% elif message.tags == 'success' %}<i data-lucide="check-circle" class="w-4 h-4 text-emerald-500"></i>
+                {% else %}<i data-lucide="info" class="w-4 h-4 text-blue-500"></i>{% endif %}
+                <span>{{ message }}</span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- PHẦN NỘI DUNG CHÍNH (MAIN BODY) -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- SCRIPT ĐIỀU KHIỂN THEME & ÂM THANH CHIME -->
+    <script>
+        function toggleTheme() {
+            const isDark = document.documentElement.classList.toggle('dark');
+            localStorage.setItem('studyplanner_theme', isDark ? 'dark' : 'light');
+            
+            if (window.calendar) {
+                window.calendar.render();
+            }
+            lucide.createIcons();
+        }
+
+        window.playChimeSound = function() {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContext) return;
+                const ctx = new AudioContext();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(659.25, ctx.currentTime);
+                gain.gain.setValueAtTime(0.18, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.8);
+            } catch (e) {
+                console.log(e);
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+        });
+    </script>
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

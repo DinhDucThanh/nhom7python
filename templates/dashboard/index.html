@@ -1,0 +1,539 @@
+{% extends 'base.html' %}
+
+{% block title %}Thời Khóa Biểu & Kế Hoạch Tuần — StudyPlanner AI{% endblock %}
+
+{% block content %}
+<div class="space-y-4 max-w-7xl mx-auto" x-data="unifiedPlannerApp()">
+
+    <!-- BẢNG TRẠNG THÁI & HÀNH ĐỘNG NHANH (STATUS & ACTION DECK) -->
+    <div class="bg-white dark:bg-[#131926] rounded-2xl p-4 border border-slate-200/80 dark:border-[#232B3E] shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3.5 transition-all">
+        
+        <!-- Các chỉ số tóm tắt ngày -->
+        <div class="flex flex-wrap items-center gap-2.5">
+            <!-- Chỉ số hôm nay -->
+            <div class="inline-flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-[#1A2234] border border-slate-200/70 dark:border-[#283248] text-xs text-slate-700 dark:text-slate-300">
+                <span class="w-2 h-2 rounded-full bg-blue-600"></span>
+                <span>Hôm nay: <strong class="font-semibold text-slate-900 dark:text-white">{{ daily_briefing.study_blocks|length }} phiên học</strong> ({{ daily_briefing.total_study_hours }} giờ)</span>
+            </div>
+
+            <!-- Tình trạng deadline -->
+            {% if deadline_risks.has_critical_risks %}
+            <button @click="aiInsightsModal = true"
+                    class="inline-flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/25 text-rose-700 dark:text-rose-400 text-xs font-medium hover:bg-rose-100 transition-colors">
+                <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+                <span>{{ deadline_risks.summary_badge }}</span>
+            </button>
+            {% else %}
+            <span class="inline-flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs font-medium">
+                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                <span>Tiến độ an toàn</span>
+            </span>
+            {% endif %}
+
+            <!-- Khung giờ tập trung hiệu quả -->
+            <button @click="aiInsightsModal = true"
+                    class="hidden lg:inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-[#1A2234] border border-slate-200/70 dark:border-[#283248] text-xs text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
+                <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-500"></i>
+                <span>Giờ tập trung tốt nhất: <strong class="font-semibold text-slate-900 dark:text-white">{{ study_habits.peak_focus_window }}</strong></span>
+            </button>
+        </div>
+
+        <!-- Các thao tác chính -->
+        <div class="flex items-center space-x-2.5">
+            <!-- Nút xếp lịch thông minh -->
+            <button @click="triggerOptimize()" :disabled="optimizing"
+                    class="inline-flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-sm active:scale-95 transition-all disabled:opacity-50">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-300" :class="optimizing ? 'animate-spin' : ''"></i>
+                <span x-text="optimizing ? 'Đang xếp lịch...' : 'Tự động xếp lịch'"></span>
+            </button>
+
+            <!-- Thêm việc mới -->
+            <button @click="taskModal = true"
+                    class="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-slate-50 dark:bg-[#1A2234] hover:bg-slate-100 dark:hover:bg-[#232E45] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#283248] rounded-xl text-xs font-medium transition-colors">
+                <i data-lucide="plus" class="w-3.5 h-3.5 text-slate-500"></i>
+                <span>Thêm việc</span>
+            </button>
+
+            <!-- Tải file .ics -->
+            <a href="/api/v1/calendar/export-ics" title="Tải file .ics để đồng bộ Google / Apple Calendar"
+               class="p-2 bg-slate-50 dark:bg-[#1A2234] hover:bg-slate-100 dark:hover:bg-[#232E45] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-[#283248] rounded-xl transition-colors">
+                <i data-lucide="download" class="w-4 h-4"></i>
+            </a>
+
+            <!-- Chi tiết phân tích AI -->
+            <button @click="aiInsightsModal = true" title="Xem báo cáo phân tích AI chi tiết"
+                    class="p-2 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 text-blue-600 dark:text-blue-300 border border-blue-200 dark:border-blue-500/30 rounded-xl transition-colors">
+                <i data-lucide="bar-chart-2" class="w-4 h-4"></i>
+            </button>
+        </div>
+
+    </div>
+
+    <!-- KHÔNG GIAN LÀM VIỆC CHÍNH: LỊCH TUẦN (HERO) + DANH SÁCH VIỆC CẦN LÀM -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+        
+        <!-- CỘT 1: LỊCH TUẦN FULLCALENDAR (CHIẾM 8 CỘT - ~68%) -->
+        <div class="lg:col-span-8 bg-white dark:bg-[#131926] p-4 sm:p-5 rounded-2xl border border-slate-200/80 dark:border-[#232B3E] shadow-sm space-y-4 transition-all">
+            <div id="calendar" class="w-full min-h-[640px]"></div>
+
+            <!-- Chú thích môn học & loại lịch -->
+            <div class="pt-3 border-t border-slate-100 dark:border-[#1E2638] flex flex-wrap items-center justify-between text-xs text-slate-500 dark:text-slate-400 gap-2">
+                <div class="flex flex-wrap items-center gap-3">
+                    <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">Môn học:</span>
+                    {% for c in courses %}
+                    <span class="flex items-center space-x-1.5">
+                        <span class="w-2.5 h-2.5 rounded-full" style="background-color: {{ c.color_code }}"></span>
+                        <span class="text-slate-700 dark:text-slate-300 text-xs">{{ c.name|truncatechars:20 }}</span>
+                    </span>
+                    {% endfor %}
+                </div>
+                <div class="flex items-center space-x-3 text-xs text-slate-500 dark:text-slate-400">
+                    <span class="flex items-center"><span class="w-2.5 h-2.5 rounded bg-slate-400 dark:bg-slate-600 mr-1.5"></span> Lịch trường</span>
+                    <span class="flex items-center"><span class="w-2.5 h-2.5 rounded bg-rose-700 mr-1.5"></span> Ca làm thêm</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CỘT 2: DANH SÁCH CÔNG VIỆC CẦN LÀM (CHIẾM 4 CỘT - ~32%) -->
+        <div class="lg:col-span-4 space-y-4">
+            
+            <!-- Hộp thêm nhanh công việc -->
+            <div class="bg-white dark:bg-[#131926] p-4 rounded-2xl border border-slate-200/80 dark:border-[#232B3E] shadow-sm space-y-3 transition-all">
+                <div class="flex items-center justify-between">
+                    <h2 class="font-bold text-xs text-slate-800 dark:text-slate-200 flex items-center">
+                        <i data-lucide="check-circle" class="w-4 h-4 mr-1.5 text-blue-600"></i>
+                        Công việc cần làm ({{ pending_tasks.count }})
+                    </h2>
+                    <span class="text-xs text-slate-400 dark:text-slate-500 font-mono">{{ completed_tasks }}/{{ total_tasks }} hoàn thành</span>
+                </div>
+
+                <!-- Form tạo việc nhanh -->
+                <form method="POST" action="{% url 'task_create' %}" class="space-y-2.5">
+                    {% csrf_token %}
+                    <input type="text" name="title" required placeholder="+ Nhập tên công việc mới..."
+                           class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-medium">
+                    
+                    <div class="grid grid-cols-2 gap-2">
+                        <select name="course_id" required class="w-full px-2.5 py-2 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:border-blue-500 focus:outline-none">
+                            {% for c in courses %}
+                            <option value="{{ c.id }}">{{ c.name|truncatechars:16 }}</option>
+                            {% endfor %}
+                        </select>
+                        <select name="priority" class="w-full px-2.5 py-2 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:border-blue-500 focus:outline-none">
+                            <option value="CRITICAL">Rất gấp</option>
+                            <option value="HIGH">Ưu tiên cao</option>
+                            <option value="MEDIUM" selected>Bình thường</option>
+                            <option value="LOW">Thấp</option>
+                        </select>
+                    </div>
+
+                    <div class="flex items-center space-x-2">
+                        <input type="datetime-local" name="deadline" required
+                               class="w-full px-2.5 py-2 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-xs font-mono text-slate-600 dark:text-slate-400 focus:border-blue-500 focus:outline-none">
+                        <input type="hidden" name="estimated_minutes" value="60">
+                        <button type="submit" class="px-4 py-2 bg-slate-900 dark:bg-[#1E2638] hover:bg-slate-800 text-white rounded-xl text-xs font-semibold transition-colors flex-shrink-0">
+                            Lưu việc
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Danh sách thẻ công việc -->
+            <div class="bg-white dark:bg-[#131926] p-3.5 rounded-2xl border border-slate-200/80 dark:border-[#232B3E] shadow-sm space-y-2.5 max-h-[520px] overflow-y-auto transition-all">
+                {% for t in pending_tasks %}
+                <div class="p-3.5 rounded-xl border transition-all space-y-2.5
+                            {% if t.priority == 'CRITICAL' %}bg-rose-50/50 dark:bg-rose-500/5 border-rose-200 dark:border-rose-500/20
+                            {% elif t.priority == 'HIGH' %}bg-amber-50/50 dark:bg-amber-500/5 border-amber-200 dark:border-amber-500/20
+                            {% else %}bg-slate-50/70 dark:bg-[#161D2C] border-slate-200/70 dark:border-[#20293D]{% endif %}">
+                    
+                    <!-- Tiêu đề & Môn học -->
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="space-y-1 min-w-0">
+                            <div class="flex items-center space-x-1.5">
+                                <span class="w-2 h-2 rounded-full flex-shrink-0" style="background-color: {{ t.course.color_code }}"></span>
+                                <span class="text-[11px] font-medium text-slate-500 dark:text-slate-400 truncate">{{ t.course.name|truncatechars:20 }}</span>
+                            </div>
+                            <h4 class="text-xs font-bold text-slate-900 dark:text-white leading-snug truncate">{{ t.title }}</h4>
+                        </div>
+
+                        <!-- Đánh dấu hoàn thành -->
+                        <a href="{% url 'task_toggle' t.id %}" title="Đánh dấu hoàn thành"
+                           class="w-5 h-5 rounded-lg border border-slate-300 dark:border-[#283248] hover:border-emerald-500 hover:bg-emerald-500/10 flex items-center justify-center text-slate-400 hover:text-emerald-500 transition-all flex-shrink-0 bg-white dark:bg-[#131926]">
+                            <i data-lucide="check" class="w-3.5 h-3.5"></i>
+                        </a>
+                    </div>
+
+                    <!-- Tiến độ & Hạn chót -->
+                    <div class="space-y-1.5">
+                        <div class="flex items-center justify-between text-[11px]">
+                            <span class="{% if t.is_past_deadline %}text-rose-600 dark:text-rose-400 font-bold{% else %}text-slate-500 dark:text-slate-400{% endif %}">
+                                Hạn: {{ t.deadline|date:"d/m H:i" }}
+                            </span>
+                            <span class="text-slate-600 dark:text-slate-400 font-medium">{{ t.completed_minutes }}/{{ t.estimated_minutes }} phút</span>
+                        </div>
+                        <div class="w-full bg-slate-200 dark:bg-[#0B0F17] h-1.5 rounded-full overflow-hidden">
+                            <div class="h-full rounded-full bg-blue-600 transition-all" style="width: {{ t.progress_percent }}%"></div>
+                        </div>
+                    </div>
+
+                    <!-- Nút thao tác: Học ngay & Phân rã AI -->
+                    <div class="pt-2 flex items-center justify-between border-t border-slate-200/60 dark:border-[#20293D]">
+                        <a href="{% url 'pomodoro' %}?task_id={{ t.id }}"
+                           class="inline-flex items-center space-x-1.5 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:text-rose-700">
+                            <i data-lucide="timer" class="w-3.5 h-3.5"></i>
+                            <span>Học ngay</span>
+                        </a>
+
+                        <button type="button" @click="decomposeTask({{ t.id }})"
+                                class="inline-flex items-center space-x-1.5 text-xs font-semibold text-blue-600 dark:text-blue-300 hover:text-blue-700">
+                            <i data-lucide="sparkles" class="w-3.5 h-3.5 text-blue-500"></i>
+                            <span>Gợi ý chia nhỏ (AI)</span>
+                        </button>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="py-10 text-center text-xs text-slate-400 dark:text-slate-500 space-y-1">
+                    <i data-lucide="check-circle-2" class="w-7 h-7 mx-auto text-emerald-500"></i>
+                    <div class="font-medium">Tuyệt vời! Không còn việc tồn đọng.</div>
+                </div>
+                {% endfor %}
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- THÔNG BÁO TOAST NỔI -->
+    <div x-show="toast.show" 
+         x-transition:enter="transition ease-out duration-150"
+         x-transition:enter-start="opacity-0 translate-y-3"
+         x-transition:enter-end="opacity-100 translate-y-0"
+         x-transition:leave="transition ease-in duration-100"
+         class="fixed bottom-6 right-6 z-50 flex items-center space-x-2.5 px-4 py-2.5 rounded-2xl bg-slate-900 dark:bg-[#1E2638] text-white text-xs font-medium shadow-2xl border border-slate-700"
+         style="display: none;">
+        <i data-lucide="check" class="w-4 h-4 text-emerald-400"></i>
+        <span x-text="toast.message"></span>
+    </div>
+
+    <!-- MODAL 1: BẢNG PHÂN TÍCH AI ĐẦY ĐỦ -->
+    <div x-show="aiInsightsModal" 
+         @click.away="aiInsightsModal = false"
+         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm"
+         style="display: none;">
+        <div class="bg-white dark:bg-[#131926] rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 dark:border-[#232B3E] space-y-4 max-h-[88vh] overflow-y-auto">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#1E2638]">
+                <div class="flex items-center space-x-2.5">
+                    <div class="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-500/20 text-blue-600 dark:text-blue-300 flex items-center justify-center">
+                        <i data-lucide="sparkles" class="w-4 h-4"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-sm text-slate-900 dark:text-white">Báo cáo phân tích học tập AI</h3>
+                        <p class="text-[11px] text-slate-500 dark:text-slate-400">Đánh giá rủi ro deadline, nhịp sinh học và phân bổ thời gian</p>
+                    </div>
+                </div>
+                <button @click="aiInsightsModal = false" class="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded-xl hover:bg-slate-100 dark:hover:bg-[#1A2234]">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+            <div class="space-y-3">
+                <!-- Thẻ 1: Tóm tắt ngày học -->
+                <div class="p-4 rounded-2xl bg-slate-50 dark:bg-[#182030] border border-slate-200/60 dark:border-[#232B3E] space-y-1.5">
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="font-semibold text-slate-900 dark:text-white flex items-center">
+                            <i data-lucide="sun" class="w-4 h-4 mr-1.5 text-amber-500"></i> Tóm tắt ngày hôm nay
+                        </span>
+                        <span class="text-slate-400 dark:text-slate-500 text-[11px]">{{ daily_briefing.date_str }}</span>
+                    </div>
+                    <p class="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">{{ daily_briefing.headline }}</p>
+                    <p class="text-[11px] text-slate-500 dark:text-slate-400 italic">💡 {{ daily_briefing.key_advice }}</p>
+                </div>
+
+                <!-- Thẻ 2: Rủi ro deadline -->
+                <div class="p-4 rounded-2xl bg-rose-50/70 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/25 space-y-2">
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="font-semibold text-rose-800 dark:text-rose-300 flex items-center">
+                            <i data-lucide="alert-triangle" class="w-4 h-4 mr-1.5 text-rose-500"></i> Cảnh báo rủi ro deadline
+                        </span>
+                        <span class="text-rose-600 dark:text-rose-400 font-semibold text-[11px]">{{ deadline_risks.summary_badge }}</span>
+                    </div>
+                    <div class="space-y-2">
+                        {% for r in deadline_risks.risks|slice:":2" %}
+                        <div class="p-3 bg-white dark:bg-[#131926] rounded-xl border border-rose-200/70 dark:border-rose-500/20 text-xs space-y-0.5">
+                            <div class="font-medium text-slate-900 dark:text-white flex justify-between">
+                                <span>{{ r.task_title }}</span>
+                                <span class="text-rose-600 dark:text-rose-400 text-[10px] font-semibold">{{ r.status_label }}</span>
+                            </div>
+                            <div class="text-slate-600 dark:text-slate-400 text-[11px]">{{ r.advice }}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Thẻ 3: Thói quen học tập -->
+                <div class="p-4 rounded-2xl bg-blue-50/70 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/25 text-xs space-y-1.5">
+                    <div class="font-semibold text-blue-800 dark:text-blue-300 flex items-center">
+                        <i data-lucide="activity" class="w-4 h-4 mr-1.5 text-blue-600"></i> Thói quen & Giờ vàng tập trung
+                    </div>
+                    <p class="text-slate-700 dark:text-slate-300 leading-relaxed">{{ study_habits.habit_insight }}</p>
+                    <div class="text-[11px] text-slate-500 dark:text-slate-400 pt-1 flex justify-between">
+                        <span>Đỉnh tập trung: <strong class="text-slate-900 dark:text-white">{{ study_habits.peak_focus_window }}</strong></span>
+                        <span>Điểm hiệu quả: <strong class="text-amber-500">{{ study_habits.avg_efficiency_score }}/5.0 ⭐</strong></span>
+                    </div>
+                </div>
+
+                <!-- Thẻ 4: Gợi ý phân bổ tải -->
+                <div class="p-4 rounded-2xl bg-slate-50 dark:bg-[#182030] border border-slate-200/60 dark:border-[#232B3E] text-xs space-y-1">
+                    <div class="font-semibold text-slate-900 dark:text-white flex items-center">
+                        <i data-lucide="scale" class="w-4 h-4 mr-1.5 text-purple-500"></i> Cân bằng thời gian trong tuần
+                    </div>
+                    {% for sug in time_allocation.suggestions %}
+                    <p class="text-slate-600 dark:text-slate-400 text-[11px]">• {{ sug }}</p>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="pt-2 flex justify-end">
+                <button @click="aiInsightsModal = false" class="px-5 py-2 bg-slate-100 dark:bg-[#1A2234] hover:bg-slate-200 dark:hover:bg-[#232E45] text-slate-800 dark:text-white rounded-xl text-xs font-semibold transition-colors">
+                    Đóng
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: GỢI Ý CHIA NHỎ CÔNG VIỆC TỪ AI -->
+    <div x-show="aiDecomposeModal.show" 
+         @click.away="aiDecomposeModal.show = false"
+         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm"
+         style="display: none;">
+        <div class="bg-white dark:bg-[#131926] rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 dark:border-[#232B3E] space-y-4 max-h-[88vh] overflow-y-auto">
+            <div class="flex items-start justify-between pb-3 border-b border-slate-100 dark:border-[#1E2638]">
+                <div>
+                    <span class="text-[10px] font-semibold text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-500/20 px-2 py-0.5 rounded">Gợi ý lộ trình</span>
+                    <h3 class="text-sm font-bold text-slate-900 dark:text-white mt-1.5" x-text="aiDecomposeModal.taskTitle"></h3>
+                </div>
+                <button @click="aiDecomposeModal.show = false" class="text-slate-400 hover:text-slate-700 dark:hover:text-white p-1 rounded-lg"><i data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+
+            <div x-show="aiDecomposeModal.loading" class="py-8 text-center space-y-3">
+                <div class="w-7 h-7 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                <div class="text-xs text-slate-500 dark:text-slate-400">Đang phân tích các bước học tập phù hợp...</div>
+            </div>
+
+            <div x-show="!aiDecomposeModal.loading" class="space-y-3">
+                <div class="p-3.5 rounded-xl bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 text-xs text-blue-800 dark:text-blue-300 leading-relaxed" x-text="aiDecomposeModal.analysis"></div>
+                
+                <div class="space-y-2.5">
+                    <template x-for="(m, idx) in aiDecomposeModal.milestones" :key="idx">
+                        <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-[#182030] border border-slate-200/70 dark:border-[#232B3E] space-y-1 text-xs">
+                            <div class="flex justify-between font-bold text-slate-900 dark:text-white">
+                                <span x-text="m.title"></span>
+                                <span class="text-blue-600 dark:text-blue-300 font-mono text-[11px]" x-text="m.duration_minutes + ' phút'"></span>
+                            </div>
+                            <div class="text-slate-600 dark:text-slate-400 text-[11px]" x-text="m.focus_goal"></div>
+                            <div class="text-[10px] text-slate-500 dark:text-slate-400 italic" x-text="'💡 ' + m.technique_tip"></div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <div class="pt-2 flex justify-end">
+                <button @click="aiDecomposeModal.show = false" class="px-5 py-2 bg-slate-100 dark:bg-[#1A2234] hover:bg-slate-200 dark:hover:bg-[#232E45] text-slate-800 dark:text-white rounded-xl text-xs font-semibold transition-colors">
+                    Đã hiểu
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 3: XEM CHI TIẾT SỰ KIỆN TRÊN LỊCH -->
+    <div x-show="eventModal.show" 
+         @click.away="eventModal.show = false"
+         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/70 backdrop-blur-xs"
+         style="display: none;">
+        <div class="bg-white dark:bg-[#131926] rounded-3xl max-w-xs w-full p-5 shadow-2xl border border-slate-200 dark:border-[#232B3E] space-y-3">
+            <div class="flex items-start justify-between">
+                <div>
+                    <span class="text-[10px] font-semibold px-2.5 py-0.5 rounded-full"
+                          :class="eventModal.isBusy ? 'bg-slate-100 dark:bg-[#1A2234] text-slate-600 dark:text-slate-400' : 'bg-blue-50 dark:bg-blue-500/20 text-blue-600 dark:text-blue-300'"
+                          x-text="eventModal.typeLabel"></span>
+                    <h3 class="text-xs font-bold text-slate-900 dark:text-white mt-1.5" x-text="eventModal.title"></h3>
+                </div>
+                <button @click="eventModal.show = false" class="text-slate-400 hover:text-slate-700 dark:hover:text-white p-1 rounded-lg"><i data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+
+            <div class="p-3 rounded-xl bg-slate-50 dark:bg-[#182030] border border-slate-200/60 dark:border-[#232B3E] text-xs space-y-1.5 text-slate-600 dark:text-slate-400">
+                <div class="flex justify-between"><span class="font-medium">Thời gian:</span><span class="text-slate-900 dark:text-white font-mono font-semibold" x-text="eventModal.timeStr"></span></div>
+                <div class="flex justify-between" x-show="!eventModal.isBusy"><span class="font-medium">Môn học:</span><span class="text-slate-800 dark:text-slate-200" x-text="eventModal.course"></span></div>
+                <div class="flex justify-between" x-show="eventModal.isBusy"><span class="font-medium">Địa điểm:</span><span class="text-slate-800 dark:text-slate-200" x-text="eventModal.location || 'Tại lớp'"></span></div>
+            </div>
+
+            <div class="flex justify-end space-x-2 pt-1">
+                <button @click="eventModal.show = false" class="px-3 py-1.5 rounded-xl text-xs font-medium text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1A2234] transition-colors">Đóng</button>
+                <a :href="'/pomodoro/?task_id=' + eventModal.taskId" x-show="!eventModal.isBusy && eventModal.taskId"
+                   class="inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold shadow-xs transition-all">
+                    <i data-lucide="timer" class="w-3.5 h-3.5"></i>
+                    <span>Học ngay</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function unifiedPlannerApp() {
+        return {
+            optimizing: false,
+            aiInsightsModal: false,
+            taskModal: false,
+            calendar: null,
+            toast: { show: false, message: '' },
+            eventModal: { show: false, isBusy: false, title: '', timeStr: '', course: '', location: '', taskId: null, typeLabel: '' },
+            aiDecomposeModal: { show: false, loading: false, taskTitle: '', analysis: '', milestones: [] },
+
+            showToast(msg) {
+                this.toast.message = msg;
+                this.toast.show = true;
+                setTimeout(() => { this.toast.show = false; }, 3000);
+            },
+
+            init() {
+                const calendarEl = document.getElementById('calendar');
+                const self = this;
+
+                this.calendar = new FullCalendar.Calendar(calendarEl, {
+                    initialView: 'timeGridWeek',
+                    headerToolbar: {
+                        left: 'prev,next today',
+                        center: 'title',
+                        right: 'timeGridWeek,timeGridDay'
+                    },
+                    locale: 'vi',
+                    firstDay: 1, // Thứ Hai
+                    slotMinTime: '07:00:00',
+                    slotMaxTime: '22:30:00',
+                    slotDuration: '00:30:00',
+                    allDaySlot: false,
+                    expandRows: true,
+                    nowIndicator: true,
+                    editable: true,
+                    events: '/api/v1/calendar/events',
+
+                    // Kéo thả phiên học
+                    eventDrop: function(info) {
+                        self.handleBlockMove(info);
+                    },
+
+                    // Co giãn thời lượng phiên học
+                    eventResize: function(info) {
+                        self.handleBlockMove(info);
+                    },
+
+                    // Click xem nhanh
+                    eventClick: function(info) {
+                        const props = info.event.extendedProps;
+                        const isBusy = props.type === 'busy_slot';
+                        const start = info.event.start ? info.event.start.toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'}) : '';
+                        const end = info.event.end ? info.event.end.toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'}) : '';
+
+                        self.eventModal = {
+                            show: true,
+                            isBusy: isBusy,
+                            typeLabel: isBusy ? 'Lịch bận' : 'Phiên tự học',
+                            title: info.event.title,
+                            timeStr: `${start} - ${end}`,
+                            course: props.course_name || '',
+                            location: props.location || '',
+                            taskId: props.task_id || null,
+                        };
+                        setTimeout(() => lucide.createIcons(), 30);
+                    }
+                });
+
+                this.calendar.render();
+                window.calendar = this.calendar;
+            },
+
+            async handleBlockMove(info) {
+                const event = info.event;
+                const blockId = event.extendedProps.block_id;
+                if (!blockId) {
+                    info.revert();
+                    return;
+                }
+
+                try {
+                    const res = await fetch(`/api/v1/blocks/${blockId}/move`, {
+                        method: 'PATCH',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': '{{ csrf_token }}'
+                        },
+                        body: JSON.stringify({
+                            start_datetime: event.start.toISOString(),
+                            end_datetime: event.end.toISOString(),
+                            is_locked: true
+                        })
+                    });
+
+                    if (res.ok) {
+                        this.showToast(`Đã lưu phiên "${event.title}" vào giờ mới!`);
+                        window.playChimeSound();
+                    } else {
+                        info.revert();
+                    }
+                } catch (e) {
+                    info.revert();
+                }
+            },
+
+            async triggerOptimize() {
+                this.optimizing = true;
+                try {
+                    const res = await fetch('/api/v1/optimize-schedule', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': '{{ csrf_token }}'
+                        }
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                        this.calendar.refetchEvents();
+                        this.showToast(`Đã tự động xếp ${data.created_blocks_count} phiên học tối ưu!`);
+                        window.playChimeSound();
+                        confetti({ particleCount: 70, spread: 50, origin: { y: 0.8 } });
+                    }
+                } catch (e) {
+                    alert("Lỗi khi tối ưu lịch.");
+                } finally {
+                    this.optimizing = false;
+                }
+            },
+
+            async decomposeTask(taskId) {
+                this.aiDecomposeModal.show = true;
+                this.aiDecomposeModal.loading = true;
+                try {
+                    const res = await fetch(`/api/v1/ai/tasks/${taskId}/decompose`);
+                    const data = await res.json();
+                    if (res.ok) {
+                        this.aiDecomposeModal.taskTitle = data.task_title;
+                        this.aiDecomposeModal.analysis = data.analysis;
+                        this.aiDecomposeModal.milestones = data.milestones;
+                        window.playChimeSound();
+                    }
+                } catch (e) {
+                    alert("Lỗi kết nối AI.");
+                    this.aiDecomposeModal.show = false;
+                } finally {
+                    this.aiDecomposeModal.loading = false;
+                    setTimeout(() => lucide.createIcons(), 30);
+                }
+            }
+        };
+    }
+</script>
+{% endblock %}

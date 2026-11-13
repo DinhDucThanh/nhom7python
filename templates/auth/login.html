@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+
+{% block title %}Đăng nhập — StudyPlanner AI{% endblock %}
+
+{% block content %}
+<div class="min-h-[75vh] flex flex-col justify-center py-8 sm:px-6 lg:px-8">
+    <div class="sm:mx-auto sm:w-full sm:max-w-md text-center space-y-2">
+        <div class="inline-flex w-14 h-14 rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-500 items-center justify-center text-white shadow-lg shadow-brand-500/25 mb-2">
+            <i data-lucide="sparkles" class="w-7 h-7"></i>
+        </div>
+        <h2 class="text-2xl font-black text-slate-900 dark:text-white tracking-tight">StudyPlanner AI</h2>
+        <p class="text-xs text-slate-500 dark:text-slate-400">Ứng dụng lập lịch học thông minh & tối ưu hóa năng suất</p>
+    </div>
+
+    <div class="mt-6 sm:mx-auto sm:w-full sm:max-w-md">
+        <div class="bg-white dark:bg-[#131926] py-8 px-6 shadow-xl rounded-3xl border border-slate-200/80 dark:border-[#232B3E] sm:px-8 space-y-5 transition-all">
+            
+            <form method="POST" action="{% url 'login' %}" class="space-y-4" id="loginForm">
+                {% csrf_token %}
+
+                <div>
+                    <label for="username" class="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1.5">Tên đăng nhập</label>
+                    <input id="username" name="username" type="text" required placeholder="student hoặc admin"
+                           class="block w-full px-4 py-2.5 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all font-medium">
+                </div>
+
+                <div>
+                    <label for="password" class="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1.5">Mật khẩu</label>
+                    <input id="password" name="password" type="password" required placeholder="••••••••"
+                           class="block w-full px-4 py-2.5 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all font-medium">
+                </div>
+
+                <div class="pt-1">
+                    <button type="submit"
+                            class="w-full flex justify-center py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 shadow-md shadow-brand-500/25 transition-all active:scale-[0.98]">
+                        Đăng nhập
+                    </button>
+                </div>
+            </form>
+
+            <!-- 1-Click Fast Demo Login Buttons -->
+            <div class="pt-4 border-t border-slate-100 dark:border-[#1E2638]">
+                <div class="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-center mb-3">Đăng nhập nhanh 1 chạm để demo</div>
+                <div class="grid grid-cols-2 gap-2.5">
+                    <button type="button" onclick="fillLogin('student', 'student123')"
+                            class="flex flex-col items-center p-2.5 rounded-2xl bg-slate-50 dark:bg-[#1A2234] hover:bg-emerald-50 dark:hover:bg-emerald-500/10 border border-slate-200 dark:border-[#283248] transition-all text-left group">
+                        <span class="text-xs font-bold text-slate-800 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 flex items-center">
+                            <i data-lucide="graduation-cap" class="w-4 h-4 mr-1.5 text-emerald-500"></i> Sinh viên
+                        </span>
+                        <span class="text-[10px] text-slate-400 font-mono mt-0.5">student / student123</span>
+                    </button>
+
+                    <button type="button" onclick="fillLogin('admin', 'admin123')"
+                            class="flex flex-col items-center p-2.5 rounded-2xl bg-slate-50 dark:bg-[#1A2234] hover:bg-amber-50 dark:hover:bg-amber-500/10 border border-slate-200 dark:border-[#283248] transition-all text-left group">
+                        <span class="text-xs font-bold text-slate-800 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-400 flex items-center">
+                            <i data-lucide="shield" class="w-4 h-4 mr-1.5 text-amber-500"></i> Quản trị viên
+                        </span>
+                        <span class="text-[10px] text-slate-400 font-mono mt-0.5">admin / admin123</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="pt-2 text-center text-xs text-slate-500 dark:text-slate-400 font-medium">
+                <span>Chưa có tài khoản? </span>
+                <a href="{% url 'register' %}" class="font-bold text-brand-600 dark:text-brand-300 hover:underline">Đăng ký mới</a>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+    function fillLogin(u, p) {
+        document.getElementById('username').value = u;
+        document.getElementById('password').value = p;
+        document.getElementById('loginForm').submit();
+    }
+</script>
+{% endblock %}
