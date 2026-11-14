@@ -100,6 +100,10 @@ class StudyMaterial(models.Model):
     def is_office(self):
         return self.file_extension in ['doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx']
 
+    @property
+    def is_word(self):
+        return self.file_extension in ['doc', 'docx']
+
 
 class BusySlot(models.Model):
     CATEGORY_CLASS = 'CLASS'

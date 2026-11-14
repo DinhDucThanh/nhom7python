@@ -276,7 +276,7 @@ def courses_view(request):
     courses = Course.objects.filter(user=user).annotate(
         task_count=Count('tasks'),
         material_count=Count('materials')
-    )
+    ).prefetch_related('materials')
     materials = StudyMaterial.objects.filter(
         Q(course__user=user) | Q(task__user=user)
     ).select_related('course', 'task')
@@ -334,27 +334,53 @@ def material_create_view(request):
         material_type = request.POST.get('material_type', StudyMaterial.TYPE_NOTE)
         url = request.POST.get('url', '').strip()
         content = request.POST.get('content', '').strip()
-        file_obj = request.FILES.get('file')
+
+        # Nhận nhiều file cùng lúc từ drag-and-drop hoặc input
+        files = request.FILES.getlist('files')
+        if not files:
+            single = request.FILES.get('file')
+            if single:
+                files = [single]
 
         course = get_object_or_404(Course, id=course_id, user=request.user) if course_id else None
 
-        if file_obj:
-            material_type = StudyMaterial.TYPE_FILE
+        if files:
+            created_count = 0
+            for f in files:
+                # Nếu tải 1 file và có tiêu đề tùy chỉnh thì dùng tiêu đề đó, nếu tải nhiều file thì lấy tên file không đuôi
+                if len(files) == 1 and title:
+                    f_title = title
+                else:
+                    name_part = f.name.rsplit('.', 1)[0]
+                    f_title = name_part if name_part else f.name
+
+                StudyMaterial.objects.create(
+                    course=course,
+                    title=f_title,
+                    material_type=StudyMaterial.TYPE_FILE,
+                    url=url if url else None,
+                    content=content,
+                    file=f,
+                )
+                created_count += 1
+
+            if created_count > 1:
+                messages.success(request, f"Đã thêm thành công {created_count} tệp tài liệu vào mục '{course.name if course else 'Chung'}'!")
+            else:
+                messages.success(request, f"Đã thêm tài liệu thành công!")
+        else:
             if not title:
-                title = file_obj.name
+                title = url or "Ghi chú tài liệu mới"
 
-        if not title:
-            title = url or "Tài liệu học tập"
-
-        material = StudyMaterial.objects.create(
-            course=course,
-            title=title,
-            material_type=material_type,
-            url=url if url else None,
-            content=content,
-            file=file_obj,
-        )
-        messages.success(request, f"Đã thêm tài liệu '{material.title}' thành công!")
+            material = StudyMaterial.objects.create(
+                course=course,
+                title=title,
+                material_type=material_type,
+                url=url if url else None,
+                content=content,
+                file=None,
+            )
+            messages.success(request, f"Đã thêm tài liệu '{material.title}' thành công!")
     return redirect('courses')
 
 

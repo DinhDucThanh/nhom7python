@@ -1,15 +1,22 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}Môn Học, Lịch Bận & Tài Liệu — StudyPlanner AI{% endblock %}
 
 {% block content %}
 <div class="space-y-5 max-w-7xl mx-auto" 
      x-data="{ 
-         activeTab: 'courses', 
+         activeTab: 'materials', 
          courseModal: false, 
          busyModal: false, 
          materialModal: false,
+         selectedCourseId: '',
+         
+         // Preview Modal State
          previewModal: false,
+         docxLoading: false,
+         docxError: false,
+         docxHtml: '',
          previewItem: {
              title: '',
              url: '',
@@ -19,13 +26,79 @@
              isImage: false,
              isPdf: false,
              isText: false,
+             isWord: false,
              courseName: '',
              content: ''
          },
+
+         // Filter & Search & Sorter State
+         searchQuery: '',
+         filterCourse: 'ALL',
+         filterType: 'ALL',
+         viewMode: 'GROUPED', // 'GROUPED' (theo mục môn học) hoặc 'GRID' (thẻ rời)
+
+         // Logic mở xem trước (Không tự động tải về, nạp DOCX trực tiếp bằng Mammoth)
          openPreview(item) {
              this.previewItem = item;
              this.previewModal = true;
+             this.docxHtml = '';
+             this.docxLoading = false;
+             this.docxError = false;
+
+             if (item.isWord || item.fileExt === 'DOCX' || item.fileExt === 'DOC') {
+                 this.docxLoading = true;
+                 fetch(item.fileUrl)
+                     .then(res => {
+                         if (!res.ok) throw new Error('Không thể tải tệp');
+                         return res.arrayBuffer();
+                     })
+                     .then(buf => {
+                         if (window.mammoth) {
+                             return mammoth.convertToHtml({arrayBuffer: buf});
+                         } else {
+                             throw new Error('Thư viện đọc Word chưa sẵn sàng');
+                         }
+                     })
+                     .then(result => {
+                         this.docxHtml = result.value || '<p class=\"text-slate-400 italic\">Tài liệu không có nội dung văn bản.</p>';
+                         this.docxLoading = false;
+                     })
+                     .catch(err => {
+                         console.error('Lỗi đọc Word DOCX:', err);
+                         this.docxError = true;
+                         this.docxLoading = false;
+                     });
+             }
              this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
+         },
+
+         // Hàm mở modal thêm tài liệu cho 1 mục cụ thể
+         openAddMaterialForCourse(courseId) {
+             this.selectedCourseId = courseId;
+             this.materialModal = true;
+             this.$nextTick(() => {
+                 const sel = document.getElementById('modal-course-select');
+                 if (sel && courseId) sel.value = courseId;
+                 if (window.lucide) lucide.createIcons();
+             });
+         },
+
+         // Hàm kiểm tra tệp có khớp bộ lọc và thanh tìm kiếm hay không
+         matchesFilter(title, courseName, fileExt, content) {
+             if (this.searchQuery.trim()) {
+                 const q = this.searchQuery.toLowerCase().trim();
+                 const hay = (title + ' ' + courseName + ' ' + fileExt + ' ' + content).toLowerCase();
+                 if (!hay.includes(q)) return false;
+             }
+             if (this.filterCourse !== 'ALL' && courseName !== this.filterCourse) {
+                 return false;
+             }
+             const ext = (fileExt || '').toUpperCase();
+             if (this.filterType === 'DOCX' && !['DOCX', 'DOC'].includes(ext)) return false;
+             if (this.filterType === 'PDF' && ext !== 'PDF') return false;
+             if (this.filterType === 'IMAGE' && !['PNG', 'JPG', 'JPEG', 'WEBP', 'GIF', 'SVG'].includes(ext)) return false;
+             if (this.filterType === 'OTHER' && (['DOCX', 'DOC', 'PDF', 'PNG', 'JPG', 'JPEG', 'WEBP', 'GIF', 'SVG'].includes(ext) || !ext)) return false;
+             return true;
          }
      }"
      x-effect="if (materialModal || courseModal || busyModal || previewModal) { $nextTick(() => { if (window.lucide) lucide.createIcons(); }); }">
@@ -44,6 +117,13 @@
 
         <!-- Chuyển đổi tab -->
         <div class="flex items-center space-x-1.5 p-1.5 bg-slate-100 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-2xl text-xs font-semibold">
+            <button @click="activeTab = 'materials'" 
+                    :class="activeTab === 'materials' ? 'bg-white dark:bg-[#1E2638] text-slate-900 dark:text-white shadow-xs border border-slate-200/60 dark:border-[#283248]' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'"
+                    class="px-3.5 py-1.5 rounded-xl transition-all flex items-center space-x-1.5">
+                <i data-lucide="paperclip" class="w-3.5 h-3.5 text-blue-500"></i>
+                <span>Tài liệu ({{ materials.count }})</span>
+            </button>
+
             <button @click="activeTab = 'courses'" 
                     :class="activeTab === 'courses' ? 'bg-white dark:bg-[#1E2638] text-slate-900 dark:text-white shadow-xs border border-slate-200/60 dark:border-[#283248]' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'"
                     class="px-3.5 py-1.5 rounded-xl transition-all flex items-center space-x-1.5">
@@ -55,20 +135,342 @@
                     :class="activeTab === 'busy' ? 'bg-white dark:bg-[#1E2638] text-slate-900 dark:text-white shadow-xs border border-slate-200/60 dark:border-[#283248]' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'"
                     class="px-3.5 py-1.5 rounded-xl transition-all flex items-center space-x-1.5">
                 <i data-lucide="lock" class="w-3.5 h-3.5"></i>
-                <span>Lịch bận & Ca làm ({{ busy_slots.count }})</span>
-            </button>
-
-            <button @click="activeTab = 'materials'" 
-                    :class="activeTab === 'materials' ? 'bg-white dark:bg-[#1E2638] text-slate-900 dark:text-white shadow-xs border border-slate-200/60 dark:border-[#283248]' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'"
-                    class="px-3.5 py-1.5 rounded-xl transition-all flex items-center space-x-1.5">
-                <i data-lucide="paperclip" class="w-3.5 h-3.5"></i>
-                <span>Tài liệu ({{ materials.count }})</span>
+                <span>Lịch bận ({{ busy_slots.count }})</span>
             </button>
         </div>
     </div>
 
+    <!-- ================================================================= -->
+    <!-- TAB 3: TÀI LIỆU ÔN TẬP (CÓ TÌM KIẾM, FILTER, SORTER & GOM THEO MỤC) -->
+    <!-- ================================================================= -->
+    <div x-show="activeTab === 'materials'" class="space-y-4">
+        
+        <!-- THANH CÔNG CỤ TÌM KIẾM, BỘ LỌC VÀ CHUYỂN CHẾ ĐỘ XEM -->
+        <div class="bg-white dark:bg-[#131926] rounded-2xl p-4 border border-slate-200/80 dark:border-[#232B3E] shadow-sm space-y-3">
+            <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+                
+                <!-- Thanh tìm kiếm (Search bar) -->
+                <div class="relative flex-1">
+                    <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                    <input type="text" 
+                           x-model="searchQuery" 
+                           placeholder="Tìm kiếm theo tên tài liệu, môn học, từ khóa..." 
+                           class="w-full pl-9 pr-8 py-2 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all font-medium">
+                    <button x-show="searchQuery" @click="searchQuery = ''" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5">
+                        <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                    </button>
+                </div>
+
+                <!-- Cụm bộ lọc: Môn học & Định dạng -->
+                <div class="flex items-center gap-2 flex-wrap">
+                    <!-- Filter Môn học -->
+                    <select x-model="filterCourse" class="px-3 py-2 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-xs text-slate-800 dark:text-slate-200 font-medium focus:border-blue-500 focus:outline-none">
+                        <option value="ALL">Tất cả môn học</option>
+                        {% for c in courses %}
+                        <option value="{{ c.name }}">{{ c.name }}</option>
+                        {% endfor %}
+                    </select>
+
+                    <!-- Filter Định dạng tệp -->
+                    <select x-model="filterType" class="px-3 py-2 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-xs text-slate-800 dark:text-slate-200 font-medium focus:border-blue-500 focus:outline-none">
+                        <option value="ALL">Tất cả định dạng</option>
+                        <option value="DOCX">Word (.docx, .doc)</option>
+                        <option value="PDF">Tài liệu PDF (.pdf)</option>
+                        <option value="IMAGE">Hình ảnh (.png, .jpg...)</option>
+                        <option value="OTHER">Định dạng khác</option>
+                    </select>
+
+                    <!-- Chuyển chế độ xem: Gom nhóm theo môn vs Dạng lưới -->
+                    <div class="flex items-center p-1 bg-slate-100 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-xs">
+                        <button type="button" 
+                                @click="viewMode = 'GROUPED'"
+                                :class="viewMode === 'GROUPED' ? 'bg-white dark:bg-[#1E2638] text-blue-600 dark:text-white shadow-xs font-bold' : 'text-slate-500 dark:text-slate-400'"
+                                title="Gom tài liệu vào từng mục môn học"
+                                class="px-2.5 py-1 rounded-lg transition-all flex items-center space-x-1">
+                            <i data-lucide="folder" class="w-3.5 h-3.5"></i>
+                            <span class="hidden sm:inline">Theo mục</span>
+                        </button>
+                        <button type="button" 
+                                @click="viewMode = 'GRID'"
+                                :class="viewMode === 'GRID' ? 'bg-white dark:bg-[#1E2638] text-blue-600 dark:text-white shadow-xs font-bold' : 'text-slate-500 dark:text-slate-400'"
+                                title="Xem danh sách từng thẻ"
+                                class="px-2.5 py-1 rounded-lg transition-all flex items-center space-x-1">
+                            <i data-lucide="layout-grid" class="w-3.5 h-3.5"></i>
+                            <span class="hidden sm:inline">Lưới thẻ</span>
+                        </button>
+                    </div>
+
+                    <!-- Nút thêm tài liệu mới (Hỗ trợ kéo nhiều file) -->
+                    <button @click="materialModal = true; selectedCourseId = '';" 
+                            class="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition-all shadow-sm active:scale-95 shrink-0">
+                        <i data-lucide="plus" class="w-4 h-4"></i>
+                        <span>Thêm tệp</span>
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- ======================================================== -->
+        <!-- CHẾ ĐỘ 1: GOM TẤT CẢ TÀI LIỆU VÀO TỪNG MỤC MÔN HỌC (FOLDER VIEW) -->
+        <!-- ======================================================== -->
+        <div x-show="viewMode === 'GROUPED'" class="space-y-5">
+            {% for c in courses %}
+            <div class="bg-white dark:bg-[#131926] rounded-3xl p-5 sm:p-6 border border-slate-200/80 dark:border-[#232B3E] shadow-sm space-y-4 transition-all"
+                 x-show="filterCourse === 'ALL' || filterCourse === '{{ c.name|escapejs }}'">
+                
+                <!-- Header của Mục Môn Học -->
+                <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#1E2638] flex-wrap gap-2">
+                    <div class="flex items-center space-x-3">
+                        <span class="w-4 h-4 rounded-full ring-2 ring-white dark:ring-[#131926] shadow-xs" style="background-color: {{ c.color_code }}"></span>
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <h3 class="font-bold text-slate-900 dark:text-white text-base">{{ c.name }}</h3>
+                                <span class="text-xs font-mono font-medium px-2 py-0.5 rounded bg-slate-100 dark:bg-[#1A2234] text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-[#283248]">{{ c.code|default:"CS" }}</span>
+                            </div>
+                            <p class="text-xs text-slate-400 mt-0.5">{{ c.semester }} • Mục tài liệu môn học</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center space-x-2">
+                        <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-200/60 dark:border-blue-500/20">
+                            {{ c.materials.all|length }} tài liệu
+                        </span>
+                        
+                        <!-- Nút thêm tệp trực tiếp vào mục này -->
+                        <button type="button" 
+                                @click="openAddMaterialForCourse('{{ c.id }}')"
+                                class="inline-flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-[#1E2638] hover:bg-blue-50 hover:text-blue-600 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-all">
+                            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                            <span>Thêm vào mục này</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Danh sách tài liệu thuộc mục này -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                    {% for m in c.materials.all %}
+                    <div class="bg-slate-50/70 dark:bg-[#0E131F] rounded-2xl p-4 border border-slate-200/80 dark:border-[#232B3E] hover:border-blue-400/60 hover:shadow-sm transition-all flex flex-col justify-between space-y-3 group"
+                         x-show="matchesFilter('{{ m.title|escapejs }}', '{{ c.name|escapejs }}', '{{ m.file_extension|upper }}', '{{ m.content|default:''|escapejs }}')">
+                        
+                        <div class="space-y-2.5">
+                            <div class="flex items-center justify-between">
+                                <!-- Badge định dạng -->
+                                <span class="text-[11px] font-bold px-2 py-0.5 rounded-lg border uppercase
+                                    {% if m.is_word %}bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-500/20 dark:text-blue-300 dark:border-blue-500/30
+                                    {% elif m.is_pdf %}bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-500/20 dark:text-rose-300 dark:border-rose-500/30
+                                    {% elif m.is_image %}bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/30
+                                    {% else %}bg-slate-200 text-slate-700 border-slate-300 dark:bg-[#1A2234] dark:text-slate-300 dark:border-[#283248]{% endif %}">
+                                    {{ m.file_extension|default:"DOC" }}
+                                </span>
+
+                                <!-- Xóa -->
+                                <a href="{% url 'material_delete' m.id %}" 
+                                   onclick="return confirm('Xóa tài liệu \'{{ m.title }}\'?')"
+                                   title="Xóa tài liệu"
+                                   class="text-slate-400 hover:text-rose-500 p-1 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors">
+                                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                                </a>
+                            </div>
+
+                            <div>
+                                <h4 class="font-bold text-slate-900 dark:text-white text-xs sm:text-sm truncate cursor-pointer hover:text-blue-600 transition-colors"
+                                    @click="openPreview({
+                                        title: '{{ m.title|escapejs }}',
+                                        url: '{{ m.url|default:''|escapejs }}',
+                                        fileUrl: '{% if m.file %}{{ m.file.url|escapejs }}{% endif %}',
+                                        fileName: '{{ m.file_name|escapejs }}',
+                                        fileExt: '{{ m.file_extension|upper }}',
+                                        isImage: {% if m.is_image %}true{% else %}false{% endif %},
+                                        isPdf: {% if m.is_pdf %}true{% else %}false{% endif %},
+                                        isText: {% if m.is_text %}true{% else %}false{% endif %},
+                                        isWord: {% if m.is_word %}true{% else %}false{% endif %},
+                                        courseName: '{{ c.name|escapejs }}',
+                                        content: '{{ m.content|default:''|escapejs }}'
+                                    })">
+                                    {{ m.title }}
+                                </h4>
+                                {% if m.file %}
+                                <p class="text-[11px] text-slate-400 truncate mt-0.5">{{ m.file_name }}</p>
+                                {% endif %}
+                            </div>
+
+                            <!-- Ảnh xem nhanh nếu là file ảnh -->
+                            {% if m.file and m.is_image %}
+                            <div class="h-24 rounded-xl overflow-hidden bg-slate-200 dark:bg-black/30 cursor-pointer"
+                                 @click="openPreview({
+                                    title: '{{ m.title|escapejs }}',
+                                    url: '',
+                                    fileUrl: '{{ m.file.url|escapejs }}',
+                                    fileName: '{{ m.file_name|escapejs }}',
+                                    fileExt: '{{ m.file_extension|upper }}',
+                                    isImage: true,
+                                    isPdf: false,
+                                    isText: false,
+                                    isWord: false,
+                                    courseName: '{{ c.name|escapejs }}',
+                                    content: '{{ m.content|default:''|escapejs }}'
+                                 })">
+                                <img src="{{ m.file.url }}" alt="{{ m.title }}" class="w-full h-full object-cover hover:scale-105 transition-transform duration-200">
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Các nút thao tác tệp: Xem trước (Không tải về) và Tải bản sao dự phòng -->
+                        <div class="pt-2 border-t border-slate-200/60 dark:border-[#1E2638] flex items-center justify-between text-xs">
+                            <button type="button"
+                                    @click="openPreview({
+                                        title: '{{ m.title|escapejs }}',
+                                        url: '{{ m.url|default:''|escapejs }}',
+                                        fileUrl: '{% if m.file %}{{ m.file.url|escapejs }}{% endif %}',
+                                        fileName: '{{ m.file_name|escapejs }}',
+                                        fileExt: '{{ m.file_extension|upper }}',
+                                        isImage: {% if m.is_image %}true{% else %}false{% endif %},
+                                        isPdf: {% if m.is_pdf %}true{% else %}false{% endif %},
+                                        isText: {% if m.is_text %}true{% else %}false{% endif %},
+                                        isWord: {% if m.is_word %}true{% else %}false{% endif %},
+                                        courseName: '{{ c.name|escapejs }}',
+                                        content: '{{ m.content|default:''|escapejs }}'
+                                    })"
+                                    class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[11px] transition-colors shadow-xs">
+                                <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+                                <span>Xem trước</span>
+                            </button>
+
+                            <div class="flex items-center space-x-1">
+                                {% if m.file %}
+                                <a href="{{ m.file.url }}" download title="Lưu bản sao về máy (nếu mất file gốc)"
+                                   class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-[#1A2234] transition-colors">
+                                    <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                                </a>
+                                {% endif %}
+                                {% if m.url %}
+                                <a href="{{ m.url }}" target="_blank" title="Mở đường link"
+                                   class="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
+                                    <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+                                </a>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                    </div>
+                    {% empty %}
+                    <div class="col-span-full py-6 text-center border-2 border-dashed border-slate-200 dark:border-[#232B3E] rounded-2xl cursor-pointer hover:border-blue-400 transition-colors"
+                         @click="openAddMaterialForCourse('{{ c.id }}')">
+                        <i data-lucide="folder-plus" class="w-6 h-6 mx-auto text-slate-400 mb-1"></i>
+                        <p class="text-xs font-semibold text-slate-600 dark:text-slate-400">Mục này chưa có tài liệu nào</p>
+                        <p class="text-[11px] text-slate-400">Nhấn vào đây để kéo thả nhiều tệp vào mục môn học này</p>
+                    </div>
+                    {% endfor %}
+                </div>
+
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- ======================================================== -->
+        <!-- CHẾ ĐỘ 2: XEM DẠNG THẺ LƯỚI TẤT CẢ (GRID VIEW) -->
+        <!-- ======================================================== -->
+        <div x-show="viewMode === 'GRID'" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" style="display: none;">
+            {% for m in materials %}
+            <div class="bg-white dark:bg-[#131926] rounded-2xl p-5 border border-slate-200/80 dark:border-[#232B3E] shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-3.5"
+                 x-show="matchesFilter('{{ m.title|escapejs }}', '{% if m.course %}{{ m.course.name|escapejs }}{% endif %}', '{{ m.file_extension|upper }}', '{{ m.content|default:''|escapejs }}')">
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-2">
+                            <span class="text-xs font-bold px-2 py-0.5 rounded-md uppercase
+                                {% if m.is_word %}bg-blue-100 text-blue-700
+                                {% elif m.is_pdf %}bg-rose-100 text-rose-700
+                                {% elif m.is_image %}bg-emerald-100 text-emerald-700
+                                {% else %}bg-slate-100 text-slate-700 dark:bg-[#1A2234] dark:text-slate-300{% endif %}">
+                                {{ m.file_extension|default:"GHI CHÚ" }}
+                            </span>
+                            {% if m.course %}
+                            <span class="text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-50 dark:bg-[#1A2234]" style="color: {{ m.course.color_code }}">{{ m.course.name }}</span>
+                            {% endif %}
+                        </div>
+
+                        <a href="{% url 'material_delete' m.id %}" onclick="return confirm('Xóa tài liệu này?')" class="text-slate-400 hover:text-rose-500 p-1">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </a>
+                    </div>
+
+                    <div>
+                        <h4 class="font-bold text-slate-900 dark:text-white text-sm cursor-pointer hover:text-blue-600"
+                            @click="openPreview({
+                                title: '{{ m.title|escapejs }}',
+                                url: '{{ m.url|default:''|escapejs }}',
+                                fileUrl: '{% if m.file %}{{ m.file.url|escapejs }}{% endif %}',
+                                fileName: '{{ m.file_name|escapejs }}',
+                                fileExt: '{{ m.file_extension|upper }}',
+                                isImage: {% if m.is_image %}true{% else %}false{% endif %},
+                                isPdf: {% if m.is_pdf %}true{% else %}false{% endif %},
+                                isText: {% if m.is_text %}true{% else %}false{% endif %},
+                                isWord: {% if m.is_word %}true{% else %}false{% endif %},
+                                courseName: '{% if m.course %}{{ m.course.name|escapejs }}{% endif %}',
+                                content: '{{ m.content|default:''|escapejs }}'
+                            })">
+                            {{ m.title }}
+                        </h4>
+                        {% if m.content %}
+                        <p class="text-xs text-slate-500 mt-1 line-clamp-2">{{ m.content }}</p>
+                        {% endif %}
+                    </div>
+
+                    {% if m.file and m.is_image %}
+                    <img src="{{ m.file.url }}" alt="{{ m.title }}" class="w-full h-32 object-cover rounded-xl cursor-pointer"
+                         @click="openPreview({
+                            title: '{{ m.title|escapejs }}',
+                            url: '',
+                            fileUrl: '{{ m.file.url|escapejs }}',
+                            fileName: '{{ m.file_name|escapejs }}',
+                            fileExt: '{{ m.file_extension|upper }}',
+                            isImage: true,
+                            isPdf: false,
+                            isText: false,
+                            isWord: false,
+                            courseName: '{% if m.course %}{{ m.course.name|escapejs }}{% endif %}',
+                            content: '{{ m.content|default:''|escapejs }}'
+                         })">
+                    {% endif %}
+                </div>
+
+                <div class="pt-3 border-t border-slate-100 dark:border-[#1E2638] flex items-center justify-between text-xs">
+                    <button type="button"
+                            @click="openPreview({
+                                title: '{{ m.title|escapejs }}',
+                                url: '{{ m.url|default:''|escapejs }}',
+                                fileUrl: '{% if m.file %}{{ m.file.url|escapejs }}{% endif %}',
+                                fileName: '{{ m.file_name|escapejs }}',
+                                fileExt: '{{ m.file_extension|upper }}',
+                                isImage: {% if m.is_image %}true{% else %}false{% endif %},
+                                isPdf: {% if m.is_pdf %}true{% else %}false{% endif %},
+                                isText: {% if m.is_text %}true{% else %}false{% endif %},
+                                isWord: {% if m.is_word %}true{% else %}false{% endif %},
+                                courseName: '{% if m.course %}{{ m.course.name|escapejs }}{% endif %}',
+                                content: '{{ m.content|default:''|escapejs }}'
+                            })"
+                            class="inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-blue-600 text-white font-semibold text-xs shadow-xs">
+                        <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+                        <span>Xem trước</span>
+                    </button>
+
+                    {% if m.file %}
+                    <a href="{{ m.file.url }}" download title="Lưu bản sao về máy" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700">
+                        <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+    </div>
+
+    <!-- ================================================================= -->
     <!-- TAB 1: DANH SÁCH MÔN HỌC -->
-    <div x-show="activeTab === 'courses'" class="space-y-4">
+    <!-- ================================================================= -->
+    <div x-show="activeTab === 'courses'" class="space-y-4" style="display: none;">
         <div class="flex justify-end">
             <button @click="courseModal = true" class="inline-flex items-center space-x-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition-all shadow-sm active:scale-95">
                 <i data-lucide="plus" class="w-4 h-4"></i>
@@ -120,7 +522,9 @@
         </div>
     </div>
 
+    <!-- ================================================================= -->
     <!-- TAB 2: LỊCH BẬN CỐ ĐỊNH -->
+    <!-- ================================================================= -->
     <div x-show="activeTab === 'busy'" class="space-y-4" style="display: none;">
         <div class="flex items-center justify-between">
             <p class="text-xs text-slate-500 dark:text-slate-400">Lịch học trên trường và ca làm thêm sẽ được thuật toán tự động né tránh khi xếp lịch.</p>
@@ -156,12 +560,6 @@
                             <span>{{ slot.start_time|time:"H:i" }} - {{ slot.end_time|time:"H:i" }}</span>
                             <span>({% if slot.is_recurring %}{{ slot.get_day_of_week_display }}{% else %}{{ slot.specific_date|date:"d/m/Y" }}{% endif %})</span>
                         </div>
-                        {% if slot.location %}
-                        <div class="flex items-center space-x-1.5 text-xs text-slate-500 dark:text-slate-400 mt-1">
-                            <i data-lucide="map-pin" class="w-3.5 h-3.5"></i>
-                            <span class="truncate">{{ slot.location }}</span>
-                        </div>
-                        {% endif %}
                     </div>
                 </div>
 
@@ -170,211 +568,13 @@
                     <span class="w-2.5 h-2.5 rounded-full" style="background-color: {{ slot.color_code }}"></span>
                 </div>
             </div>
-            {% empty %}
-            <div class="col-span-full bg-white dark:bg-[#131926] rounded-2xl p-10 border border-slate-200/80 dark:border-[#232B3E] text-center space-y-3">
-                <div class="w-12 h-12 mx-auto rounded-2xl bg-amber-50 dark:bg-amber-500/10 flex items-center justify-center text-amber-600">
-                    <i data-lucide="calendar-off" class="w-6 h-6"></i>
-                </div>
-                <p class="font-semibold text-sm text-slate-800 dark:text-slate-200">Chưa có lịch bận cố định</p>
-                <p class="text-xs text-slate-400 max-w-sm mx-auto">Thêm lịch học trên lớp hoặc ca làm việc để StudyPlanner AI tự động né tránh khi tối ưu thời gian học.</p>
-            </div>
             {% endfor %}
         </div>
     </div>
 
-    <!-- TAB 3: TÀI LIỆU ÔN TẬP (HỖ TRỢ XEM TRỰC TIẾP TRÊN WEB GIỐNG ZALO) -->
-    <div x-show="activeTab === 'materials'" class="space-y-4" style="display: none;">
-        <div class="flex items-center justify-between">
-            <p class="text-xs text-slate-500 dark:text-slate-400">Kho tài liệu học tập, slide bài giảng, tệp đề cương và liên kết ôn thi.</p>
-            <button @click="materialModal = true" class="inline-flex items-center space-x-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition-all shadow-sm active:scale-95">
-                <i data-lucide="plus" class="w-4 h-4"></i>
-                <span>Thêm tài liệu ôn tập</span>
-            </button>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {% for m in materials %}
-            <div class="bg-white dark:bg-[#131926] rounded-2xl p-5 border border-slate-200/80 dark:border-[#232B3E] shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-3.5 group">
-                <div class="space-y-3">
-                    
-                    <!-- Dòng tiêu đề thẻ & nút xóa -->
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center space-x-2">
-                            <span class="text-xs font-medium px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-[#1A2234] border border-slate-200 dark:border-[#283248] text-slate-600 dark:text-slate-400 flex items-center space-x-1">
-                                {% if m.file %}
-                                    {% if m.is_image %}
-                                    <i data-lucide="image" class="w-3 h-3 text-emerald-500"></i>
-                                    <span>Hình ảnh</span>
-                                    {% elif m.is_pdf %}
-                                    <i data-lucide="file-text" class="w-3 h-3 text-rose-500"></i>
-                                    <span>Tài liệu PDF</span>
-                                    {% else %}
-                                    <i data-lucide="file" class="w-3 h-3 text-blue-500"></i>
-                                    <span>Tệp đính kèm</span>
-                                    {% endif %}
-                                {% elif m.url %}
-                                <i data-lucide="link" class="w-3 h-3 text-emerald-500"></i>
-                                <span>Đường link</span>
-                                {% else %}
-                                <i data-lucide="file-text" class="w-3 h-3 text-slate-400"></i>
-                                <span>Ghi chú</span>
-                                {% endif %}
-                            </span>
-                            {% if m.course %}
-                            <span class="text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-50 dark:bg-[#1A2234]" style="color: {{ m.course.color_code }}">{{ m.course.name }}</span>
-                            {% endif %}
-                        </div>
-
-                        <!-- Nút Xóa Tài Liệu -->
-                        <a href="{% url 'material_delete' m.id %}" 
-                           onclick="return confirm('Xác nhận xóa tài liệu &quot;{{ m.title }}&quot;?')"
-                           title="Xóa tài liệu"
-                           class="text-slate-400 hover:text-rose-500 p-1 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors">
-                            <i data-lucide="trash-2" class="w-4 h-4"></i>
-                        </a>
-                    </div>
-
-                    <!-- Tiêu đề và ghi chú tóm tắt (Bấm vào để mở xem trực tiếp) -->
-                    <div>
-                        <h3 class="font-bold text-slate-900 dark:text-white text-sm leading-snug cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                            @click="openPreview({
-                                title: '{{ m.title|escapejs }}',
-                                url: '{{ m.url|default:''|escapejs }}',
-                                fileUrl: '{% if m.file %}{{ m.file.url|escapejs }}{% endif %}',
-                                fileName: '{{ m.file_name|escapejs }}',
-                                fileExt: '{{ m.file_extension|upper }}',
-                                isImage: {% if m.is_image %}true{% else %}false{% endif %},
-                                isPdf: {% if m.is_pdf %}true{% else %}false{% endif %},
-                                isText: {% if m.is_text %}true{% else %}false{% endif %},
-                                courseName: '{% if m.course %}{{ m.course.name|escapejs }}{% endif %}',
-                                content: '{{ m.content|default:''|escapejs }}'
-                            })">
-                            {{ m.title }}
-                        </h3>
-                        {% if m.content %}
-                        <p class="text-xs text-slate-600 dark:text-slate-400 mt-2 leading-relaxed bg-slate-50 dark:bg-[#0B0F17] p-3 rounded-xl border border-slate-100 dark:border-[#1E2638] whitespace-pre-line">{{ m.content }}</p>
-                        {% endif %}
-                    </div>
-
-                    <!-- Ảnh thu nhỏ (Thumbnail preview trực quan nếu tệp là hình ảnh giống Zalo) -->
-                    {% if m.file and m.is_image %}
-                    <div class="relative rounded-2xl overflow-hidden border border-slate-200 dark:border-[#232B3E] bg-slate-100 dark:bg-[#0B0F17] cursor-pointer group/img"
-                         @click="openPreview({
-                            title: '{{ m.title|escapejs }}',
-                            url: '',
-                            fileUrl: '{{ m.file.url|escapejs }}',
-                            fileName: '{{ m.file_name|escapejs }}',
-                            fileExt: '{{ m.file_extension|upper }}',
-                            isImage: true,
-                            isPdf: false,
-                            isText: false,
-                            courseName: '{% if m.course %}{{ m.course.name|escapejs }}{% endif %}',
-                            content: '{{ m.content|default:''|escapejs }}'
-                         })">
-                        <img src="{{ m.file.url }}" alt="{{ m.title }}" class="w-full h-36 object-cover group-hover/img:scale-105 transition-transform duration-300">
-                        <div class="absolute inset-0 bg-slate-900/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-semibold space-x-1.5 backdrop-blur-[2px]">
-                            <i data-lucide="eye" class="w-4 h-4"></i>
-                            <span>Xem ảnh trực tiếp</span>
-                        </div>
-                    </div>
-                    {% endif %}
-
-                    <!-- Khung tệp đính kèm -->
-                    {% if m.file %}
-                    <div class="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-[#0E131F] border border-slate-200/80 dark:border-[#232B3E] text-xs">
-                        <div class="flex items-center space-x-2.5 min-w-0 cursor-pointer"
-                             @click="openPreview({
-                                title: '{{ m.title|escapejs }}',
-                                url: '',
-                                fileUrl: '{{ m.file.url|escapejs }}',
-                                fileName: '{{ m.file_name|escapejs }}',
-                                fileExt: '{{ m.file_extension|upper }}',
-                                isImage: {% if m.is_image %}true{% else %}false{% endif %},
-                                isPdf: {% if m.is_pdf %}true{% else %}false{% endif %},
-                                isText: {% if m.is_text %}true{% else %}false{% endif %},
-                                courseName: '{% if m.course %}{{ m.course.name|escapejs }}{% endif %}',
-                                content: '{{ m.content|default:''|escapejs }}'
-                             })">
-                            <div class="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-[10px] uppercase shrink-0">
-                                {{ m.file_extension|default:"FILE"|slice:":4" }}
-                            </div>
-                            <div class="min-w-0">
-                                <p class="font-semibold text-slate-800 dark:text-slate-200 truncate text-xs hover:text-blue-600">{{ m.file_name }}</p>
-                                <p class="text-[10px] text-slate-400">Đã lưu trong hệ thống</p>
-                            </div>
-                        </div>
-
-                        <!-- Cụm nút: Ưu tiên Xem trước, Tải về chỉ là dự phòng khi máy chưa có file -->
-                        <div class="flex items-center space-x-1.5 shrink-0">
-                            <!-- Nút chính: Xem trước tài liệu trực tiếp trên web -->
-                            <button type="button"
-                                    @click="openPreview({
-                                        title: '{{ m.title|escapejs }}',
-                                        url: '',
-                                        fileUrl: '{{ m.file.url|escapejs }}',
-                                        fileName: '{{ m.file_name|escapejs }}',
-                                        fileExt: '{{ m.file_extension|upper }}',
-                                        isImage: {% if m.is_image %}true{% else %}false{% endif %},
-                                        isPdf: {% if m.is_pdf %}true{% else %}false{% endif %},
-                                        isText: {% if m.is_text %}true{% else %}false{% endif %},
-                                        courseName: '{% if m.course %}{{ m.course.name|escapejs }}{% endif %}',
-                                        content: '{{ m.content|default:''|escapejs }}'
-                                    })"
-                                    class="inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs transition-colors shadow-xs">
-                                <i data-lucide="eye" class="w-3.5 h-3.5"></i>
-                                <span>Xem trước</span>
-                            </button>
-
-                            <!-- Nút phụ: Tải về (khi máy user bị mất file) -->
-                            <a href="{{ m.file.url }}" download title="Tải bản sao về máy (khi đổi thiết bị hoặc mất file gốc)"
-                               class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-[#1E2638] transition-colors">
-                                <i data-lucide="download" class="w-3.5 h-3.5"></i>
-                            </a>
-                        </div>
-                    </div>
-                    {% endif %}
-                </div>
-
-                <!-- Footer thẻ -->
-                <div class="pt-3 border-t border-slate-100 dark:border-[#1E2638] flex items-center justify-between text-xs">
-                    {% if m.url %}
-                    <a href="{{ m.url }}" target="_blank" class="font-semibold text-blue-600 dark:text-blue-300 hover:underline flex items-center text-xs">
-                        <i data-lucide="external-link" class="w-3.5 h-3.5 mr-1"></i> Mở liên kết web
-                    </a>
-                    {% elif not m.file %}
-                    <span class="text-slate-400 dark:text-slate-500 text-xs">Ghi chú học tập</span>
-                    {% else %}
-                    <button type="button" @click="openPreview({
-                        title: '{{ m.title|escapejs }}',
-                        url: '',
-                        fileUrl: '{{ m.file.url|escapejs }}',
-                        fileName: '{{ m.file_name|escapejs }}',
-                        fileExt: '{{ m.file_extension|upper }}',
-                        isImage: {% if m.is_image %}true{% else %}false{% endif %},
-                        isPdf: {% if m.is_pdf %}true{% else %}false{% endif %},
-                        isText: {% if m.is_text %}true{% else %}false{% endif %},
-                        courseName: '{% if m.course %}{{ m.course.name|escapejs }}{% endif %}',
-                        content: '{{ m.content|default:''|escapejs }}'
-                    })" class="text-blue-600 dark:text-blue-400 hover:underline text-[11px] font-semibold flex items-center">
-                        <i data-lucide="eye" class="w-3 h-3 mr-1"></i> Mở xem trực tiếp
-                    </button>
-                    {% endif %}
-                    <span class="text-slate-400 dark:text-slate-500 text-[11px] font-mono">{{ m.created_at|date:"d/m/Y H:i" }}</span>
-                </div>
-            </div>
-            {% empty %}
-            <div class="col-span-full bg-white dark:bg-[#131926] rounded-2xl p-10 border border-slate-200/80 dark:border-[#232B3E] text-center space-y-3">
-                <div class="w-12 h-12 mx-auto rounded-2xl bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center text-indigo-600">
-                    <i data-lucide="folder-open" class="w-6 h-6"></i>
-                </div>
-                <p class="font-semibold text-sm text-slate-800 dark:text-slate-200">Chưa có tài liệu ôn tập nào</p>
-                <p class="text-xs text-slate-400 max-w-sm mx-auto">Nhấn "Thêm tài liệu ôn tập" để kéo-thả tệp bài giảng từ máy tính, lưu ghi chú hoặc dán liên kết ôn thi.</p>
-            </div>
-            {% endfor %}
-        </div>
-    </div>
-
-    <!-- MODAL 4: TRÌNH XEM TRƯỚC TÀI LIỆU TRỰC TIẾP (PREVIEW MODAL GIỐNG ZALO) -->
+    <!-- ================================================================= -->
+    <!-- MODAL 4: TRÌNH XEM TRƯỚC TÀI LIỆU TRỰC TIẾP (HỖ TRỢ WORD .DOCX QUA MAMMOTH) -->
+    <!-- ================================================================= -->
     <div x-show="previewModal" 
          @click.away="previewModal = false" 
          class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/80 dark:bg-black/85 backdrop-blur-md" 
@@ -400,15 +600,7 @@
 
                 <!-- Các nút tác vụ trong modal -->
                 <div class="flex items-center space-x-2 shrink-0">
-                    <!-- Mở tab mới toàn màn hình -->
-                    <a :href="previewItem.fileUrl || previewItem.url" target="_blank"
-                       title="Mở toàn màn hình trong tab mới"
-                       class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-[#1E2638] hover:bg-slate-200 dark:hover:bg-[#283248] text-slate-700 dark:text-slate-300 text-xs font-semibold transition-all">
-                        <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
-                        <span class="hidden sm:inline">Mở toàn trang</span>
-                    </a>
-
-                    <!-- Tải bản sao về máy (Dự phòng) -->
+                    <!-- Tải bản sao về máy (Dự phòng khi mất file gốc) -->
                     <a x-show="previewItem.fileUrl" :href="previewItem.fileUrl" download
                        title="Tải về máy tính (khi mất file hoặc đổi máy)"
                        class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-[#1E2638] hover:bg-slate-200 dark:hover:bg-[#283248] text-slate-700 dark:text-slate-300 text-xs font-semibold transition-all">
@@ -424,51 +616,72 @@
             </div>
 
             <!-- Khung hiển thị nội dung tài liệu (Preview Body) -->
-            <div class="flex-1 overflow-auto p-4 sm:p-6 bg-slate-100/50 dark:bg-[#0B0F17] flex items-center justify-center min-h-[300px]">
+            <div class="flex-1 overflow-auto p-4 sm:p-6 bg-slate-100/50 dark:bg-[#0B0F17] flex items-center justify-center min-h-[350px]">
                 
-                <!-- 1. Hiển thị Hình ảnh (PNG, JPG, WEBP, GIF) -->
+                <!-- 1. Hiển thị Tệp Word (.docx, .doc) Trực tiếp bằng Mammoth.js -->
+                <div x-show="(previewItem.isWord || previewItem.fileExt === 'DOCX' || previewItem.fileExt === 'DOC') && previewItem.fileUrl" 
+                     class="w-full max-h-[72vh] overflow-y-auto p-2 sm:p-4 flex flex-col items-center" style="display: none;">
+                    
+                    <div x-show="docxLoading" class="py-16 text-center space-y-3">
+                        <div class="w-9 h-9 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                        <p class="text-xs text-slate-600 dark:text-slate-400 font-semibold">Đang trích xuất và hiển thị nội dung Word trực tiếp...</p>
+                    </div>
+
+                    <!-- Nội dung trang tài liệu Word hiển thị đẹp như trang in A4 -->
+                    <div x-show="!docxLoading && !docxError" 
+                         class="bg-white text-slate-900 p-8 sm:p-12 rounded-2xl shadow-md border border-slate-200 max-w-3xl w-full text-xs sm:text-sm leading-relaxed docx-rendered-content"
+                         x-html="docxHtml">
+                    </div>
+
+                    <div x-show="docxError" class="py-12 text-center space-y-3 bg-white dark:bg-[#131926] p-8 rounded-2xl border border-slate-200 dark:border-[#232B3E] max-w-md">
+                        <i data-lucide="alert-circle" class="w-8 h-8 mx-auto text-amber-500"></i>
+                        <p class="text-xs text-slate-700 dark:text-slate-300 font-semibold">Không thể giải mã tệp Word cũ trực tiếp.</p>
+                        <a :href="previewItem.fileUrl" download class="inline-flex items-center space-x-1.5 px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold">
+                            <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                            <span>Tải về để mở trên máy</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- 2. Hiển thị Hình ảnh (PNG, JPG, WEBP, GIF) -->
                 <div x-show="previewItem.isImage && previewItem.fileUrl" class="max-w-full max-h-[70vh] flex items-center justify-center p-2" style="display: none;">
                     <img :src="previewItem.fileUrl" :alt="previewItem.title" 
                          class="max-w-full max-h-[68vh] object-contain rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700">
                 </div>
 
-                <!-- 2. Hiển thị PDF Document -->
+                <!-- 3. Hiển thị PDF Document -->
                 <div x-show="previewItem.isPdf && previewItem.fileUrl" class="w-full h-[70vh] rounded-2xl overflow-hidden shadow-sm border border-slate-200 dark:border-[#232B3E] bg-white" style="display: none;">
                     <iframe :src="previewItem.fileUrl" class="w-full h-full border-0"></iframe>
                 </div>
 
-                <!-- 3. Hiển thị File Văn Bản / Mã Nguồn -->
+                <!-- 4. Hiển thị File Văn Bản / Mã Nguồn (.txt, .py...) -->
                 <div x-show="previewItem.isText && previewItem.fileUrl" class="w-full h-[65vh] rounded-2xl overflow-hidden shadow-sm border border-slate-200 dark:border-[#232B3E] bg-white dark:bg-[#131926]" style="display: none;">
                     <iframe :src="previewItem.fileUrl" class="w-full h-full border-0 font-mono text-xs p-4"></iframe>
                 </div>
 
-                <!-- 4. Hiển thị File Office / Word / PowerPoint / ZIP -->
-                <div x-show="previewItem.fileUrl && !previewItem.isImage && !previewItem.isPdf && !previewItem.isText" class="bg-white dark:bg-[#131926] p-8 rounded-3xl border border-slate-200/80 dark:border-[#232B3E] shadow-sm max-w-md w-full text-center space-y-4" style="display: none;">
+                <!-- 5. Tệp định dạng khác (ZIP, Excel, PPTX...) -->
+                <div x-show="previewItem.fileUrl && !previewItem.isWord && !previewItem.isImage && !previewItem.isPdf && !previewItem.isText" 
+                     class="bg-white dark:bg-[#131926] p-8 rounded-3xl border border-slate-200/80 dark:border-[#232B3E] shadow-sm max-w-md w-full text-center space-y-4" style="display: none;">
                     <div class="w-16 h-16 mx-auto rounded-2xl bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center text-blue-600">
-                        <i data-lucide="file-text" class="w-8 h-8"></i>
+                        <i data-lucide="file" class="w-8 h-8"></i>
                     </div>
                     <div>
                         <h4 class="font-bold text-slate-900 dark:text-white text-base" x-text="previewItem.fileName"></h4>
                         <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Định dạng: <span class="font-mono font-bold uppercase text-blue-600" x-text="previewItem.fileExt"></span></p>
                     </div>
                     <p class="text-xs text-slate-600 dark:text-slate-400 leading-relaxed bg-slate-50 dark:bg-[#0B0F17] p-3 rounded-xl border border-slate-100 dark:border-[#1E2638]">
-                        Bạn đã có sẵn tệp tài liệu này trên máy tính của mình. Bạn có thể mở trực tiếp từ thiết bị hoặc tải lại bản sao dự phòng bên dưới nếu cần.
+                        Tài liệu này đã được lưu trong mục của bạn. Bạn có thể mở trực tiếp từ thiết bị hoặc tải bản sao dự phòng.
                     </p>
                     <div class="flex items-center justify-center gap-3 pt-2">
-                        <a :href="previewItem.fileUrl" target="_blank" 
-                           class="inline-flex items-center space-x-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition-colors shadow-xs">
-                            <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
-                            <span>Mở trong tab mới</span>
-                        </a>
                         <a :href="previewItem.fileUrl" download 
-                           class="inline-flex items-center space-x-1.5 px-4 py-2 bg-slate-100 dark:bg-[#1E2638] hover:bg-slate-200 dark:hover:bg-[#283248] text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition-colors">
+                           class="inline-flex items-center space-x-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition-colors shadow-xs">
                             <i data-lucide="download" class="w-3.5 h-3.5"></i>
                             <span>Lưu bản sao</span>
                         </a>
                     </div>
                 </div>
 
-                <!-- 5. Hiển thị Ghi chú thuần hoặc liên kết web -->
+                <!-- 6. Ghi chú thuần hoặc liên kết web -->
                 <div x-show="!previewItem.fileUrl" class="bg-white dark:bg-[#131926] p-6 rounded-3xl border border-slate-200/80 dark:border-[#232B3E] shadow-sm max-w-lg w-full space-y-4" style="display: none;">
                     <h4 class="font-bold text-slate-900 dark:text-white text-base" x-text="previewItem.title"></h4>
                     <p class="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-line leading-relaxed bg-slate-50 dark:bg-[#0B0F17] p-4 rounded-2xl border border-slate-100 dark:border-[#1E2638]" x-text="previewItem.content || 'Không có nội dung ghi chú.'"></p>
@@ -488,6 +701,164 @@
                 <span class="text-slate-700 dark:text-slate-300" x-text="previewItem.content"></span>
             </div>
 
+        </div>
+    </div>
+
+    <!-- ================================================================= -->
+    <!-- MODAL 3: THÊM TÀI LIỆU ÔN TẬP (HỖ TRỢ KÉO THẢ NHIỀU FILE CÙNG LÚC) -->
+    <!-- ================================================================= -->
+    <div x-show="materialModal" @click.away="materialModal = false" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm" style="display: none;">
+        <div class="bg-white dark:bg-[#131926] rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 dark:border-[#232B3E] space-y-4 max-h-[92vh] overflow-y-auto"
+             x-data="{
+                 selectedType: 'FILE',
+                 dragOver: false,
+                 filesList: [],
+                 
+                 addFiles(newFiles) {
+                     if (!newFiles) return;
+                     for (let i = 0; i < newFiles.length; i++) {
+                         this.filesList.push(newFiles[i]);
+                     }
+                     this.selectedType = 'FILE';
+                     const titleInput = document.getElementById('material-title-input');
+                     if (titleInput && !titleInput.value.trim() && this.filesList.length === 1) {
+                         const nameWithoutExt = this.filesList[0].name.replace(/\.[^/.]+$/, '');
+                         titleInput.value = nameWithoutExt;
+                     }
+                 },
+                 onDrop(e) {
+                     this.dragOver = false;
+                     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                         this.$refs.fileInput.files = e.dataTransfer.files;
+                         this.addFiles(e.dataTransfer.files);
+                     }
+                 },
+                 removeFile(index) {
+                     this.filesList.splice(index, 1);
+                 },
+                 clearAll() {
+                     this.filesList = [];
+                     this.$refs.fileInput.value = '';
+                 }
+             }">
+            
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#1E2638]">
+                <div class="flex items-center space-x-2">
+                    <div class="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center text-blue-600">
+                        <i data-lucide="upload-cloud" class="w-4 h-4"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-slate-900 dark:text-white text-sm">Thêm tài liệu ôn tập</h3>
+                        <p class="text-[10px] text-slate-400">Có thể chọn hoặc kéo thả nhiều tệp vào cùng một mục</p>
+                    </div>
+                </div>
+                <button @click="materialModal = false" class="text-slate-400 hover:text-slate-700 dark:hover:text-white p-1 rounded-lg"><i data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+
+            <form method="POST" action="{% url 'material_create' %}" enctype="multipart/form-data" class="space-y-4 text-xs">
+                {% csrf_token %}
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Mục môn học</label>
+                    <select id="modal-course-select" name="course_id" class="w-full px-3 py-2 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-slate-900 dark:text-white focus:border-blue-500 focus:outline-none font-medium">
+                        {% for c in courses %}
+                        <option value="{{ c.id }}" :selected="selectedCourseId == '{{ c.id }}'">{{ c.name }} ({{ c.code|default:"CS" }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Khu vực kéo thả nhiều file (Drag & Drop Zone đa tệp) -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
+                        <span>Kéo thả tệp tài liệu (Word .docx, PDF, Ảnh...)</span>
+                        <span class="text-[11px] font-normal text-blue-600 font-semibold" x-show="filesList.length > 0" x-text="'Đã chọn ' + filesList.length + ' tệp'"></span>
+                    </label>
+
+                    <div @dragover.prevent="dragOver = true"
+                         @dragleave.prevent="dragOver = false"
+                         @drop.prevent="onDrop($event)"
+                         @click="$refs.fileInput.click()"
+                         :class="dragOver ? 'border-blue-500 bg-blue-50/60 dark:bg-blue-500/15 ring-2 ring-blue-500/20' : 'border-slate-300 dark:border-[#283248] hover:border-blue-400 dark:hover:border-blue-500 bg-slate-50/60 dark:bg-[#0B0F17]'"
+                         class="relative border-2 border-dashed rounded-2xl p-4 sm:p-5 text-center cursor-pointer transition-all duration-200 group">
+                        
+                        <!-- Input file cho phép chọn multiple -->
+                        <input type="file" multiple x-ref="fileInput" name="files" @change="addFiles($event.target.files)" class="hidden">
+                        
+                        <!-- Khi chưa chọn file -->
+                        <div x-show="filesList.length === 0" class="space-y-2 py-1">
+                            <div class="w-12 h-12 mx-auto rounded-2xl bg-blue-50 dark:bg-blue-500/10 group-hover:bg-blue-100 dark:group-hover:bg-blue-500/20 text-blue-600 flex items-center justify-center transition-colors">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="font-semibold text-xs text-slate-800 dark:text-slate-200">
+                                    Kéo thả 1 hoặc nhiều tệp vào đây, hoặc <span class="text-blue-600 underline">chọn từ thiết bị</span>
+                                </p>
+                                <p class="text-[11px] text-slate-400 mt-0.5">
+                                    Hỗ trợ chọn nhiều file .docx, .pdf, hình ảnh cùng lúc
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Danh sách các tệp đã chọn -->
+                        <div x-show="filesList.length > 0" class="space-y-2 max-h-48 overflow-y-auto text-left" @click.stop style="display: none;">
+                            <template x-for="(f, idx) in filesList" :key="idx">
+                                <div class="flex items-center justify-between p-2.5 rounded-xl bg-white dark:bg-[#1A2234] border border-blue-200/80 dark:border-blue-500/30 shadow-2xs">
+                                    <div class="flex items-center space-x-2.5 min-w-0">
+                                        <div class="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-[10px] uppercase shrink-0" 
+                                             x-text="f.name.split('.').pop().slice(0, 4)"></div>
+                                        <div class="min-w-0">
+                                            <p class="font-semibold text-xs text-slate-900 dark:text-white truncate" x-text="f.name"></p>
+                                            <p class="text-[10px] text-slate-400" x-text="(f.size > 1048576) ? (f.size / 1048576).toFixed(2) + ' MB' : Math.round(f.size / 1024) + ' KB'"></p>
+                                        </div>
+                                    </div>
+                                    <button type="button" @click="removeFile(idx)" class="p-1 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                        Tiêu đề tài liệu <span class="font-normal text-slate-400 text-[11px]">(Để trống nếu muốn tự lấy theo tên file)</span>
+                    </label>
+                    <input id="material-title-input" name="title" type="text" placeholder="Đề cương cuối kỳ, Slide bài giảng..." class="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-slate-900 dark:text-white focus:border-blue-500 focus:outline-none">
+                </div>
+
+                <div class="grid grid-cols-2 gap-2.5">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Loại tài liệu</label>
+                        <select name="material_type" x-model="selectedType" class="w-full px-3 py-2 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-slate-900 dark:text-white focus:border-blue-500 focus:outline-none">
+                            <option value="FILE">Tệp tin đính kèm</option>
+                            <option value="LINK">Đường dẫn URL</option>
+                            <option value="NOTE">Ghi chú</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Đường link URL (nếu có)</label>
+                        <input name="url" type="url" placeholder="https://..." class="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-slate-900 dark:text-white focus:border-blue-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Nội dung ghi chú / Tóm tắt dặn dò</label>
+                    <textarea name="content" rows="2" placeholder="Ghi chú nội dung trọng tâm ôn thi..." class="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-slate-900 dark:text-white focus:border-blue-500 focus:outline-none"></textarea>
+                </div>
+
+                <div class="flex justify-end space-x-2 pt-2 border-t border-slate-100 dark:border-[#1E2638]">
+                    <button type="button" @click="materialModal = false" class="px-4 py-2 text-xs font-medium text-slate-500 hover:text-slate-900 dark:hover:text-white">Hủy</button>
+                    <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition-colors shadow-xs flex items-center space-x-1.5">
+                        <i data-lucide="check" class="w-3.5 h-3.5"></i>
+                        <span>Lưu tài liệu</span>
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -588,151 +959,33 @@
         </div>
     </div>
 
-    <!-- MODAL 3: THÊM TÀI LIỆU ÔN TẬP (CÓ KÉO - THẢ FILE) -->
-    <div x-show="materialModal" @click.away="materialModal = false" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm" style="display: none;">
-        <div class="bg-white dark:bg-[#131926] rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 dark:border-[#232B3E] space-y-4 max-h-[92vh] overflow-y-auto"
-             x-data="{
-                 selectedType: 'FILE',
-                 dragOver: false,
-                 fileName: '',
-                 fileSize: '',
-                 fileExt: '',
-                 handleFiles(files) {
-                     if (files && files.length > 0) {
-                         const file = files[0];
-                         this.fileName = file.name;
-                         this.fileExt = file.name.split('.').pop().toUpperCase();
-                         this.fileSize = (file.size > 1048576) ? (file.size / 1048576).toFixed(2) + ' MB' : Math.round(file.size / 1024) + ' KB';
-                         this.selectedType = 'FILE';
-                         const titleInput = document.getElementById('material-title-input');
-                         if (titleInput && !titleInput.value.trim()) {
-                             const nameWithoutExt = file.name.replace(/\.[^/.]+$/, '');
-                             titleInput.value = nameWithoutExt;
-                         }
-                     }
-                 },
-                 onDrop(e) {
-                     this.dragOver = false;
-                     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-                         this.$refs.fileInput.files = e.dataTransfer.files;
-                         this.handleFiles(e.dataTransfer.files);
-                     }
-                 },
-                 clearFile() {
-                     this.fileName = '';
-                     this.fileSize = '';
-                     this.fileExt = '';
-                     this.$refs.fileInput.value = '';
-                 }
-             }">
-            <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#1E2638]">
-                <div class="flex items-center space-x-2">
-                    <div class="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center text-blue-600">
-                        <i data-lucide="upload-cloud" class="w-4 h-4"></i>
-                    </div>
-                    <h3 class="font-bold text-slate-900 dark:text-white text-sm">Thêm tài liệu ôn tập</h3>
-                </div>
-                <button @click="materialModal = false" class="text-slate-400 hover:text-slate-700 dark:hover:text-white p-1 rounded-lg"><i data-lucide="x" class="w-4 h-4"></i></button>
-            </div>
-
-            <form method="POST" action="{% url 'material_create' %}" enctype="multipart/form-data" class="space-y-4 text-xs">
-                {% csrf_token %}
-
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Môn học</label>
-                    <select name="course_id" class="w-full px-3 py-2 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-slate-900 dark:text-white focus:border-blue-500 focus:outline-none">
-                        {% for c in courses %}
-                        <option value="{{ c.id }}">{{ c.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <!-- Khu vực kéo thả file (Drag & Drop Zone) -->
-                <div>
-                    <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
-                        <span>Kéo thả tệp tài liệu (PDF, Word, PPTX, Ảnh...)</span>
-                        <span class="text-[11px] font-normal text-slate-400">Tối đa 25MB</span>
-                    </label>
-
-                    <div @dragover.prevent="dragOver = true"
-                         @dragleave.prevent="dragOver = false"
-                         @drop.prevent="onDrop($event)"
-                         @click="$refs.fileInput.click()"
-                         :class="dragOver ? 'border-blue-500 bg-blue-50/60 dark:bg-blue-500/15 ring-2 ring-blue-500/20' : 'border-slate-300 dark:border-[#283248] hover:border-blue-400 dark:hover:border-blue-500 bg-slate-50/60 dark:bg-[#0B0F17]'"
-                         class="relative border-2 border-dashed rounded-2xl p-4 sm:p-5 text-center cursor-pointer transition-all duration-200 group">
-                        
-                        <input type="file" x-ref="fileInput" name="file" @change="handleFiles($event.target.files)" class="hidden">
-                        
-                        <!-- Khi chưa chọn file -->
-                        <div x-show="!fileName" class="space-y-2 py-1">
-                            <div class="w-12 h-12 mx-auto rounded-2xl bg-blue-50 dark:bg-blue-500/10 group-hover:bg-blue-100 dark:group-hover:bg-blue-500/20 text-blue-600 flex items-center justify-center transition-colors">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
-                                </svg>
-                            </div>
-                            <div>
-                                <p class="font-semibold text-xs text-slate-800 dark:text-slate-200">
-                                    Kéo thả tệp vào đây, hoặc <span class="text-blue-600 underline">chọn từ thiết bị</span>
-                                </p>
-                                <p class="text-[11px] text-slate-400 mt-0.5">
-                                    Hỗ trợ .pdf, .docx, .pptx, .xlsx, .zip, hình ảnh
-                                </p>
-                            </div>
-                        </div>
-
-                        <!-- Khi đã chọn/kéo file vào -->
-                        <div x-show="fileName" class="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-[#1A2234] border border-blue-200 dark:border-blue-500/30 shadow-xs" @click.stop style="display: none;">
-                            <div class="flex items-center space-x-3 min-w-0">
-                                <div class="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-xs uppercase shrink-0" x-text="fileExt || 'TỆP'"></div>
-                                <div class="text-left min-w-0">
-                                    <p class="font-semibold text-xs text-slate-900 dark:text-white truncate" x-text="fileName"></p>
-                                    <p class="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5" x-text="fileSize"></p>
-                                </div>
-                            </div>
-                            <button type="button" @click="clearFile()" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors" title="Bỏ chọn tệp">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Tiêu đề tài liệu</label>
-                    <input id="material-title-input" name="title" type="text" required placeholder="Slide bài giảng, Ghi chú ôn thi..." class="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-slate-900 dark:text-white focus:border-blue-500 focus:outline-none">
-                </div>
-
-                <div class="grid grid-cols-2 gap-2.5">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Loại tài liệu</label>
-                        <select name="material_type" x-model="selectedType" class="w-full px-3 py-2 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-slate-900 dark:text-white focus:border-blue-500 focus:outline-none">
-                            <option value="FILE">Tệp tin đính kèm</option>
-                            <option value="LINK">Đường dẫn URL</option>
-                            <option value="NOTE">Ghi chú</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Đường link URL (nếu có)</label>
-                        <input name="url" type="url" placeholder="https://..." class="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-slate-900 dark:text-white focus:border-blue-500 focus:outline-none">
-                    </div>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Nội dung ghi chú / Tóm tắt</label>
-                    <textarea name="content" rows="2" placeholder="Ghi chú tóm tắt nội dung chính hoặc dặn dò ôn thi..." class="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-slate-900 dark:text-white focus:border-blue-500 focus:outline-none"></textarea>
-                </div>
-
-                <div class="flex justify-end space-x-2 pt-2 border-t border-slate-100 dark:border-[#1E2638]">
-                    <button type="button" @click="materialModal = false" class="px-4 py-2 text-xs font-medium text-slate-500 hover:text-slate-900 dark:hover:text-white">Hủy</button>
-                    <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition-colors shadow-xs flex items-center space-x-1.5">
-                        <i data-lucide="check" class="w-3.5 h-3.5"></i>
-                        <span>Lưu tài liệu</span>
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
 </div>
+
+<!-- CSS cho văn bản Word hiển thị trực tiếp -->
+<style>
+.docx-rendered-content p {
+    margin-bottom: 0.75rem;
+    line-height: 1.65;
+}
+.docx-rendered-content h1, .docx-rendered-content h2, .docx-rendered-content h3 {
+    font-weight: 800;
+    margin-top: 1.25rem;
+    margin-bottom: 0.5rem;
+    color: #0f172a;
+}
+.docx-rendered-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+}
+.docx-rendered-content th, .docx-rendered-content td {
+    border: 1px solid #cbd5e1;
+    padding: 6px 10px;
+    font-size: 11.5px;
+}
+.docx-rendered-content th {
+    background-color: #f8fafc;
+    font-weight: 700;
+}
+</style>
 {% endblock %}
