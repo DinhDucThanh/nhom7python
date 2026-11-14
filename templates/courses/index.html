@@ -4,103 +4,141 @@
 {% block title %}Môn Học, Lịch Bận & Tài Liệu — StudyPlanner AI{% endblock %}
 
 {% block content %}
+<script>
+function coursesManager() {
+    return {
+        activeTab: 'materials',
+        courseModal: false,
+        busyModal: false,
+        materialModal: false,
+        selectedCourseId: '',
+        
+        // Preview Modal State
+        previewModal: false,
+        docxLoading: false,
+        docxError: false,
+        docxHtml: '',
+        previewItem: {
+            title: '',
+            url: '',
+            fileUrl: '',
+            fileName: '',
+            fileExt: '',
+            isImage: false,
+            isPdf: false,
+            isText: false,
+            isWord: false,
+            courseName: '',
+            content: ''
+        },
+
+        // Filter & Search State
+        searchQuery: '',
+        filterCourse: 'ALL',
+        filterType: 'ALL',
+        viewMode: 'GROUPED',
+
+        openPreview(item) {
+            this.previewItem = item;
+            this.previewModal = true;
+            this.docxHtml = '';
+            this.docxLoading = false;
+            this.docxError = false;
+
+            if (item.isWord || item.fileExt === 'DOCX' || item.fileExt === 'DOC') {
+                this.docxLoading = true;
+                fetch(item.fileUrl)
+                    .then(res => {
+                        if (!res.ok) throw new Error('Không thể tải tệp');
+                        return res.arrayBuffer();
+                    })
+                    .then(buf => {
+                        if (window.mammoth) {
+                            return mammoth.convertToHtml({arrayBuffer: buf});
+                        } else {
+                            throw new Error('Thư viện đọc Word chưa sẵn sàng');
+                        }
+                    })
+                    .then(result => {
+                        this.docxHtml = result.value || '<p class="text-slate-400 italic">Tài liệu không có nội dung văn bản.</p>';
+                        this.docxLoading = false;
+                    })
+                    .catch(err => {
+                        console.error('Lỗi đọc Word DOCX:', err);
+                        this.docxError = true;
+                        this.docxLoading = false;
+                    });
+            }
+            this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
+        },
+
+        openAddMaterialForCourse(courseId) {
+            this.selectedCourseId = courseId;
+            this.materialModal = true;
+            this.$nextTick(() => {
+                const sel = document.getElementById('modal-course-select');
+                if (sel && courseId) sel.value = courseId;
+                if (window.lucide) lucide.createIcons();
+            });
+        },
+
+        matchesFilter(title, courseName, fileExt, content) {
+            if (this.searchQuery.trim()) {
+                const q = this.searchQuery.toLowerCase().trim();
+                const hay = (title + ' ' + courseName + ' ' + fileExt + ' ' + content).toLowerCase();
+                if (!hay.includes(q)) return false;
+            }
+            if (this.filterCourse !== 'ALL' && courseName !== this.filterCourse) {
+                return false;
+            }
+            const ext = (fileExt || '').toUpperCase();
+            if (this.filterType === 'DOCX' && !['DOCX', 'DOC'].includes(ext)) return false;
+            if (this.filterType === 'PDF' && ext !== 'PDF') return false;
+            if (this.filterType === 'IMAGE' && !['PNG', 'JPG', 'JPEG', 'WEBP', 'GIF', 'SVG'].includes(ext)) return false;
+            if (this.filterType === 'OTHER' && (['DOCX', 'DOC', 'PDF', 'PNG', 'JPG', 'JPEG', 'WEBP', 'GIF', 'SVG'].includes(ext) || !ext)) return false;
+            return true;
+        }
+    };
+}
+
+function materialUploader() {
+    return {
+        selectedType: 'FILE',
+        dragOver: false,
+        filesList: [],
+        
+        addFiles(newFiles) {
+            if (!newFiles) return;
+            for (let i = 0; i < newFiles.length; i++) {
+                this.filesList.push(newFiles[i]);
+            }
+            this.selectedType = 'FILE';
+            const titleInput = document.getElementById('material-title-input');
+            if (titleInput && !titleInput.value.trim() && this.filesList.length === 1) {
+                const nameWithoutExt = this.filesList[0].name.replace(/\.[^/.]+$/, '');
+                titleInput.value = nameWithoutExt;
+            }
+        },
+        onDrop(e) {
+            this.dragOver = false;
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                this.$refs.fileInput.files = e.dataTransfer.files;
+                this.addFiles(e.dataTransfer.files);
+            }
+        },
+        removeFile(index) {
+            this.filesList.splice(index, 1);
+        },
+        clearAll() {
+            this.filesList = [];
+            if (this.$refs.fileInput) this.$refs.fileInput.value = '';
+        }
+    };
+}
+</script>
+
 <div class="space-y-5 max-w-7xl mx-auto" 
-     x-data="{ 
-         activeTab: 'materials', 
-         courseModal: false, 
-         busyModal: false, 
-         materialModal: false,
-         selectedCourseId: '',
-         
-         // Preview Modal State
-         previewModal: false,
-         docxLoading: false,
-         docxError: false,
-         docxHtml: '',
-         previewItem: {
-             title: '',
-             url: '',
-             fileUrl: '',
-             fileName: '',
-             fileExt: '',
-             isImage: false,
-             isPdf: false,
-             isText: false,
-             isWord: false,
-             courseName: '',
-             content: ''
-         },
-
-         // Filter & Search & Sorter State
-         searchQuery: '',
-         filterCourse: 'ALL',
-         filterType: 'ALL',
-         viewMode: 'GROUPED', // 'GROUPED' (theo mục môn học) hoặc 'GRID' (thẻ rời)
-
-         // Logic mở xem trước (Không tự động tải về, nạp DOCX trực tiếp bằng Mammoth)
-         openPreview(item) {
-             this.previewItem = item;
-             this.previewModal = true;
-             this.docxHtml = '';
-             this.docxLoading = false;
-             this.docxError = false;
-
-             if (item.isWord || item.fileExt === 'DOCX' || item.fileExt === 'DOC') {
-                 this.docxLoading = true;
-                 fetch(item.fileUrl)
-                     .then(res => {
-                         if (!res.ok) throw new Error('Không thể tải tệp');
-                         return res.arrayBuffer();
-                     })
-                     .then(buf => {
-                         if (window.mammoth) {
-                             return mammoth.convertToHtml({arrayBuffer: buf});
-                         } else {
-                             throw new Error('Thư viện đọc Word chưa sẵn sàng');
-                         }
-                     })
-                     .then(result => {
-                         this.docxHtml = result.value || '<p class=\"text-slate-400 italic\">Tài liệu không có nội dung văn bản.</p>';
-                         this.docxLoading = false;
-                     })
-                     .catch(err => {
-                         console.error('Lỗi đọc Word DOCX:', err);
-                         this.docxError = true;
-                         this.docxLoading = false;
-                     });
-             }
-             this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
-         },
-
-         // Hàm mở modal thêm tài liệu cho 1 mục cụ thể
-         openAddMaterialForCourse(courseId) {
-             this.selectedCourseId = courseId;
-             this.materialModal = true;
-             this.$nextTick(() => {
-                 const sel = document.getElementById('modal-course-select');
-                 if (sel && courseId) sel.value = courseId;
-                 if (window.lucide) lucide.createIcons();
-             });
-         },
-
-         // Hàm kiểm tra tệp có khớp bộ lọc và thanh tìm kiếm hay không
-         matchesFilter(title, courseName, fileExt, content) {
-             if (this.searchQuery.trim()) {
-                 const q = this.searchQuery.toLowerCase().trim();
-                 const hay = (title + ' ' + courseName + ' ' + fileExt + ' ' + content).toLowerCase();
-                 if (!hay.includes(q)) return false;
-             }
-             if (this.filterCourse !== 'ALL' && courseName !== this.filterCourse) {
-                 return false;
-             }
-             const ext = (fileExt || '').toUpperCase();
-             if (this.filterType === 'DOCX' && !['DOCX', 'DOC'].includes(ext)) return false;
-             if (this.filterType === 'PDF' && ext !== 'PDF') return false;
-             if (this.filterType === 'IMAGE' && !['PNG', 'JPG', 'JPEG', 'WEBP', 'GIF', 'SVG'].includes(ext)) return false;
-             if (this.filterType === 'OTHER' && (['DOCX', 'DOC', 'PDF', 'PNG', 'JPG', 'JPEG', 'WEBP', 'GIF', 'SVG'].includes(ext) || !ext)) return false;
-             return true;
-         }
-     }"
+     x-data="coursesManager()"
      x-effect="if (materialModal || courseModal || busyModal || previewModal) { $nextTick(() => { if (window.lucide) lucide.createIcons(); }); }">
 
     <!-- Thanh tiêu đề & bộ lọc tab -->
@@ -709,38 +747,7 @@
     <!-- ================================================================= -->
     <div x-show="materialModal" @click.away="materialModal = false" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm" style="display: none;">
         <div class="bg-white dark:bg-[#131926] rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 dark:border-[#232B3E] space-y-4 max-h-[92vh] overflow-y-auto"
-             x-data="{
-                 selectedType: 'FILE',
-                 dragOver: false,
-                 filesList: [],
-                 
-                 addFiles(newFiles) {
-                     if (!newFiles) return;
-                     for (let i = 0; i < newFiles.length; i++) {
-                         this.filesList.push(newFiles[i]);
-                     }
-                     this.selectedType = 'FILE';
-                     const titleInput = document.getElementById('material-title-input');
-                     if (titleInput && !titleInput.value.trim() && this.filesList.length === 1) {
-                         const nameWithoutExt = this.filesList[0].name.replace(/\.[^/.]+$/, '');
-                         titleInput.value = nameWithoutExt;
-                     }
-                 },
-                 onDrop(e) {
-                     this.dragOver = false;
-                     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-                         this.$refs.fileInput.files = e.dataTransfer.files;
-                         this.addFiles(e.dataTransfer.files);
-                     }
-                 },
-                 removeFile(index) {
-                     this.filesList.splice(index, 1);
-                 },
-                 clearAll() {
-                     this.filesList = [];
-                     this.$refs.fileInput.value = '';
-                 }
-             }">
+             x-data="materialUploader()">
             
             <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#1E2638]">
                 <div class="flex items-center space-x-2">
