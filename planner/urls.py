@@ -22,7 +22,9 @@ urlpatterns = [
     # Courses & Materials & BusySlots
     path('courses/', views.courses_view, name='courses'),
     path('courses/create/', views.course_create_view, name='course_create'),
+    path('courses/<int:course_id>/delete/', views.course_delete_view, name='course_delete'),
     path('materials/create/', views.material_create_view, name='material_create'),
+    path('materials/<int:material_id>/delete/', views.material_delete_view, name='material_delete'),
     path('busyslots/create/', views.busyslot_create_view, name='busyslot_create'),
     path('busyslots/<int:slot_id>/delete/', views.busyslot_delete_view, name='busyslot_delete'),
 

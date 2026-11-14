@@ -266,7 +266,9 @@ def courses_view(request):
         task_count=Count('tasks'),
         material_count=Count('materials')
     )
-    materials = StudyMaterial.objects.filter(course__user=user).select_related('course', 'task')
+    materials = StudyMaterial.objects.filter(
+        Q(course__user=user) | Q(task__user=user)
+    ).select_related('course', 'task')
     busy_slots = BusySlot.objects.filter(user=user)
 
     return render(request, 'courses/index.html', {
@@ -298,6 +300,22 @@ def course_create_view(request):
 
 
 @login_required
+def course_delete_view(request, course_id):
+    course = get_object_or_404(Course, id=course_id, user=request.user)
+    name = course.name
+    # Dọn dẹp tệp tin đính kèm của các tài liệu thuộc môn học này
+    for mat in course.materials.all():
+        if mat.file:
+            try:
+                mat.file.delete(save=False)
+            except Exception:
+                pass
+    course.delete()
+    messages.info(request, f"Đã xóa môn học '{name}' cùng các tài liệu và công việc liên quan.")
+    return redirect('courses')
+
+
+@login_required
 def material_create_view(request):
     if request.method == 'POST':
         course_id = request.POST.get('course_id')
@@ -305,17 +323,45 @@ def material_create_view(request):
         material_type = request.POST.get('material_type', StudyMaterial.TYPE_NOTE)
         url = request.POST.get('url', '').strip()
         content = request.POST.get('content', '').strip()
+        file_obj = request.FILES.get('file')
 
         course = get_object_or_404(Course, id=course_id, user=request.user) if course_id else None
 
-        StudyMaterial.objects.create(
+        if file_obj:
+            material_type = StudyMaterial.TYPE_FILE
+            if not title:
+                title = file_obj.name
+
+        if not title:
+            title = url or "Tài liệu học tập"
+
+        material = StudyMaterial.objects.create(
             course=course,
             title=title,
             material_type=material_type,
             url=url if url else None,
             content=content,
+            file=file_obj,
         )
-        messages.success(request, f"Đã thêm tài liệu '{title}'!")
+        messages.success(request, f"Đã thêm tài liệu '{material.title}' thành công!")
+    return redirect('courses')
+
+
+@login_required
+def material_delete_view(request, material_id):
+    material = get_object_or_404(
+        StudyMaterial,
+        Q(course__user=request.user) | Q(task__user=request.user),
+        id=material_id
+    )
+    title = material.title
+    if material.file:
+        try:
+            material.file.delete(save=False)
+        except Exception:
+            pass
+    material.delete()
+    messages.info(request, f"Đã xóa tài liệu '{title}'.")
     return redirect('courses')
 
 

@@ -60,6 +60,7 @@ class StudyMaterial(models.Model):
     title = models.CharField(max_length=255, verbose_name="Tiêu đề tài liệu")
     material_type = models.CharField(max_length=20, choices=TYPE_CHOICES, default=TYPE_NOTE)
     url = models.URLField(max_length=500, blank=True, null=True, verbose_name="Đường dẫn")
+    file = models.FileField(upload_to='materials/', blank=True, null=True, verbose_name="Tệp đính kèm")
     content = models.TextField(blank=True, verbose_name="Nội dung ghi chú / Tóm tắt")
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -68,6 +69,20 @@ class StudyMaterial(models.Model):
 
     def __str__(self):
         return self.title
+
+    @property
+    def file_name(self):
+        if self.file:
+            import os
+            return os.path.basename(self.file.name)
+        return ""
+
+    @property
+    def file_extension(self):
+        if self.file:
+            import os
+            return os.path.splitext(self.file.name)[1].lower().replace('.', '')
+        return ""
 
 
 class BusySlot(models.Model):

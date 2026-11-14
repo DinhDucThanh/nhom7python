@@ -1,9 +1,11 @@
 {% extends 'base.html' %}
 
-{% block title %}Môn Học & Lịch Bận Cố Định — StudyPlanner AI{% endblock %}
+{% block title %}Môn Học, Lịch Bận & Tài Liệu — StudyPlanner AI{% endblock %}
 
 {% block content %}
-<div class="space-y-5 max-w-7xl mx-auto" x-data="{ activeTab: 'courses', courseModal: false, busyModal: false, materialModal: false }">
+<div class="space-y-5 max-w-7xl mx-auto" 
+     x-data="{ activeTab: 'courses', courseModal: false, busyModal: false, materialModal: false }"
+     x-effect="if (materialModal || courseModal || busyModal) { $nextTick(() => { if (window.lucide) lucide.createIcons(); }); }">
 
     <!-- Thanh tiêu đề & bộ lọc tab -->
     <div class="bg-white dark:bg-[#131926] rounded-2xl p-4 sm:p-5 border border-slate-200/80 dark:border-[#232B3E] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all">
@@ -13,7 +15,7 @@
                 Môn học, Lịch bận & Tài liệu ôn tập
             </h1>
             <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Khai báo các môn học trong kỳ, lịch học trên lớp và các ca làm thêm cố định.
+                Khai báo các môn học trong kỳ, lịch học trên lớp và các tệp tài liệu ôn thi.
             </p>
         </div>
 
@@ -56,8 +58,18 @@
             <div class="bg-white dark:bg-[#131926] rounded-2xl p-5 border border-slate-200/80 dark:border-[#232B3E] shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4">
                 <div class="space-y-2.5">
                     <div class="flex items-center justify-between">
-                        <span class="w-3.5 h-3.5 rounded-full ring-2 ring-white dark:ring-[#131926]" style="background-color: {{ c.color_code }}"></span>
-                        <span class="text-xs font-mono font-medium px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-[#1A2234] border border-slate-200 dark:border-[#283248] text-slate-600 dark:text-slate-400">{{ c.code|default:"CS" }}</span>
+                        <div class="flex items-center space-x-2">
+                            <span class="w-3.5 h-3.5 rounded-full ring-2 ring-white dark:ring-[#131926]" style="background-color: {{ c.color_code }}"></span>
+                            <span class="text-xs font-mono font-medium px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-[#1A2234] border border-slate-200 dark:border-[#283248] text-slate-600 dark:text-slate-400">{{ c.code|default:"CS" }}</span>
+                        </div>
+
+                        <!-- Nút Xóa Môn Học -->
+                        <a href="{% url 'course_delete' c.id %}" 
+                           onclick="return confirm('Xác nhận xóa môn học &quot;{{ c.name }}&quot;? Tất cả công việc và tài liệu thuộc môn học này cũng sẽ bị xóa.')"
+                           title="Xóa môn học"
+                           class="text-slate-400 hover:text-rose-500 p-1 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </a>
                     </div>
                     <div>
                         <h3 class="font-bold text-slate-900 dark:text-white text-sm sm:text-base leading-snug">{{ c.name }}</h3>
@@ -72,6 +84,14 @@
                     <span>{{ c.task_count }} công việc</span>
                     <span>{{ c.material_count }} tài liệu</span>
                 </div>
+            </div>
+            {% empty %}
+            <div class="col-span-full bg-white dark:bg-[#131926] rounded-2xl p-10 border border-slate-200/80 dark:border-[#232B3E] text-center space-y-3">
+                <div class="w-12 h-12 mx-auto rounded-2xl bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center text-blue-600">
+                    <i data-lucide="book-open" class="w-6 h-6"></i>
+                </div>
+                <p class="font-semibold text-sm text-slate-800 dark:text-slate-200">Chưa có môn học nào</p>
+                <p class="text-xs text-slate-400 max-w-sm mx-auto">Nhấn "Thêm môn học mới" ở góc phải để tạo môn học và bắt đầu lập kế hoạch ôn tập.</p>
             </div>
             {% endfor %}
         </div>
@@ -100,7 +120,8 @@
                         </span>
 
                         <a href="{% url 'busyslot_delete' slot.id %}" onclick="return confirm('Xóa lịch bận này?')"
-                           class="text-slate-400 hover:text-rose-500 p-1 rounded-lg transition-colors">
+                           title="Xóa lịch bận"
+                           class="text-slate-400 hover:text-rose-500 p-1 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors">
                             <i data-lucide="trash-2" class="w-4 h-4"></i>
                         </a>
                     </div>
@@ -126,13 +147,22 @@
                     <span class="w-2.5 h-2.5 rounded-full" style="background-color: {{ slot.color_code }}"></span>
                 </div>
             </div>
+            {% empty %}
+            <div class="col-span-full bg-white dark:bg-[#131926] rounded-2xl p-10 border border-slate-200/80 dark:border-[#232B3E] text-center space-y-3">
+                <div class="w-12 h-12 mx-auto rounded-2xl bg-amber-50 dark:bg-amber-500/10 flex items-center justify-center text-amber-600">
+                    <i data-lucide="calendar-off" class="w-6 h-6"></i>
+                </div>
+                <p class="font-semibold text-sm text-slate-800 dark:text-slate-200">Chưa có lịch bận cố định</p>
+                <p class="text-xs text-slate-400 max-w-sm mx-auto">Thêm lịch học trên lớp hoặc ca làm việc để StudyPlanner AI tự động né tránh khi tối ưu thời gian học.</p>
+            </div>
             {% endfor %}
         </div>
     </div>
 
     <!-- TAB 3: TÀI LIỆU ÔN TẬP -->
     <div x-show="activeTab === 'materials'" class="space-y-4" style="display: none;">
-        <div class="flex justify-end">
+        <div class="flex items-center justify-between">
+            <p class="text-xs text-slate-500 dark:text-slate-400">Kho tài liệu học tập, slide bài giảng, tệp đề cương và liên kết hữu ích.</p>
             <button @click="materialModal = true" class="inline-flex items-center space-x-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition-all shadow-sm active:scale-95">
                 <i data-lucide="plus" class="w-4 h-4"></i>
                 <span>Thêm tài liệu ôn tập</span>
@@ -142,34 +172,83 @@
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {% for m in materials %}
             <div class="bg-white dark:bg-[#131926] rounded-2xl p-5 border border-slate-200/80 dark:border-[#232B3E] shadow-sm flex flex-col justify-between space-y-3.5 transition-all">
-                <div class="space-y-2.5">
+                <div class="space-y-3">
                     <div class="flex items-center justify-between">
-                        <span class="text-xs font-medium px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-[#1A2234] border border-slate-200 dark:border-[#283248] text-slate-600 dark:text-slate-400">
-                            {{ m.get_material_type_display }}
-                        </span>
-                        {% if m.course %}
-                        <span class="text-xs font-semibold" style="color: {{ m.course.color_code }}">{{ m.course.name }}</span>
-                        {% endif %}
+                        <div class="flex items-center space-x-2">
+                            <span class="text-xs font-medium px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-[#1A2234] border border-slate-200 dark:border-[#283248] text-slate-600 dark:text-slate-400 flex items-center space-x-1">
+                                {% if m.file %}
+                                <i data-lucide="file" class="w-3 h-3 text-blue-500"></i>
+                                <span>Tệp đính kèm</span>
+                                {% elif m.url %}
+                                <i data-lucide="link" class="w-3 h-3 text-emerald-500"></i>
+                                <span>Đường link</span>
+                                {% else %}
+                                <i data-lucide="file-text" class="w-3 h-3 text-slate-400"></i>
+                                <span>Ghi chú</span>
+                                {% endif %}
+                            </span>
+                            {% if m.course %}
+                            <span class="text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-50 dark:bg-[#1A2234]" style="color: {{ m.course.color_code }}">{{ m.course.name }}</span>
+                            {% endif %}
+                        </div>
+
+                        <!-- Nút Xóa Tài Liệu -->
+                        <a href="{% url 'material_delete' m.id %}" 
+                           onclick="return confirm('Xác nhận xóa tài liệu &quot;{{ m.title }}&quot;?')"
+                           title="Xóa tài liệu"
+                           class="text-slate-400 hover:text-rose-500 p-1 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </a>
                     </div>
 
                     <div>
                         <h3 class="font-bold text-slate-900 dark:text-white text-sm leading-snug">{{ m.title }}</h3>
                         {% if m.content %}
-                        <p class="text-xs text-slate-600 dark:text-slate-400 mt-2 leading-relaxed bg-slate-50 dark:bg-[#0B0F17] p-3 rounded-xl border border-slate-100 dark:border-[#1E2638]">{{ m.content }}</p>
+                        <p class="text-xs text-slate-600 dark:text-slate-400 mt-2 leading-relaxed bg-slate-50 dark:bg-[#0B0F17] p-3 rounded-xl border border-slate-100 dark:border-[#1E2638] whitespace-pre-line">{{ m.content }}</p>
                         {% endif %}
                     </div>
+
+                    <!-- Hộp hiển thị tệp đính kèm nếu có -->
+                    {% if m.file %}
+                    <div class="flex items-center justify-between p-3 rounded-xl bg-blue-50/70 dark:bg-blue-500/10 border border-blue-200/70 dark:border-blue-500/20 text-xs">
+                        <div class="flex items-center space-x-2.5 min-w-0">
+                            <div class="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-[10px] uppercase shrink-0">
+                                {{ m.file_extension|default:"FILE"|slice:":4" }}
+                            </div>
+                            <div class="min-w-0">
+                                <p class="font-semibold text-slate-800 dark:text-slate-200 truncate text-xs">{{ m.file_name }}</p>
+                                <p class="text-[10px] text-slate-500 dark:text-slate-400">Tệp tải lên</p>
+                            </div>
+                        </div>
+                        <a href="{{ m.file.url }}" target="_blank" download
+                           class="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs transition-colors shrink-0 shadow-xs">
+                            <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                            <span>Tải về</span>
+                        </a>
+                    </div>
+                    {% endif %}
                 </div>
 
                 <div class="pt-3 border-t border-slate-100 dark:border-[#1E2638] flex items-center justify-between text-xs">
                     {% if m.url %}
                     <a href="{{ m.url }}" target="_blank" class="font-semibold text-blue-600 dark:text-blue-300 hover:underline flex items-center text-xs">
-                        <i data-lucide="external-link" class="w-3.5 h-3.5 mr-1"></i> Mở liên kết
+                        <i data-lucide="external-link" class="w-3.5 h-3.5 mr-1"></i> Mở liên kết web
                     </a>
+                    {% elif not m.file %}
+                    <span class="text-slate-400 dark:text-slate-500 text-xs">Ghi chú học tập</span>
                     {% else %}
-                    <span class="text-slate-400 dark:text-slate-500 text-xs">Ghi chú</span>
+                    <span></span>
                     {% endif %}
-                    <span class="text-slate-400 dark:text-slate-500 text-[11px] font-mono">{{ m.created_at|date:"d/m/Y" }}</span>
+                    <span class="text-slate-400 dark:text-slate-500 text-[11px] font-mono">{{ m.created_at|date:"d/m/Y H:i" }}</span>
                 </div>
+            </div>
+            {% empty %}
+            <div class="col-span-full bg-white dark:bg-[#131926] rounded-2xl p-10 border border-slate-200/80 dark:border-[#232B3E] text-center space-y-3">
+                <div class="w-12 h-12 mx-auto rounded-2xl bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center text-indigo-600">
+                    <i data-lucide="folder-open" class="w-6 h-6"></i>
+                </div>
+                <p class="font-semibold text-sm text-slate-800 dark:text-slate-200">Chưa có tài liệu ôn tập nào</p>
+                <p class="text-xs text-slate-400 max-w-sm mx-auto">Nhấn "Thêm tài liệu ôn tập" để kéo-thả tệp bài giảng từ máy tính, lưu ghi chú hoặc dán liên kết ôn thi.</p>
             </div>
             {% endfor %}
         </div>
@@ -272,15 +351,56 @@
         </div>
     </div>
 
-    <!-- MODAL 3: THÊM TÀI LIỆU -->
+    <!-- MODAL 3: THÊM TÀI LIỆU ÔN TẬP (CÓ KÉO - THẢ FILE) -->
     <div x-show="materialModal" @click.away="materialModal = false" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm" style="display: none;">
-        <div class="bg-white dark:bg-[#131926] rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 dark:border-[#232B3E] space-y-4">
+        <div class="bg-white dark:bg-[#131926] rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 dark:border-[#232B3E] space-y-4 max-h-[92vh] overflow-y-auto"
+             x-data="{
+                 selectedType: 'FILE',
+                 dragOver: false,
+                 fileName: '',
+                 fileSize: '',
+                 fileExt: '',
+                 handleFiles(files) {
+                     if (files && files.length > 0) {
+                         const file = files[0];
+                         this.fileName = file.name;
+                         this.fileExt = file.name.split('.').pop().toUpperCase();
+                         this.fileSize = (file.size > 1048576) ? (file.size / 1048576).toFixed(2) + ' MB' : Math.round(file.size / 1024) + ' KB';
+                         this.selectedType = 'FILE';
+                         const titleInput = document.getElementById('material-title-input');
+                         if (titleInput && !titleInput.value.trim()) {
+                             const nameWithoutExt = file.name.replace(/\.[^/.]+$/, '');
+                             titleInput.value = nameWithoutExt;
+                         }
+                     }
+                 },
+                 onDrop(e) {
+                     this.dragOver = false;
+                     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                         this.$refs.fileInput.files = e.dataTransfer.files;
+                         this.handleFiles(e.dataTransfer.files);
+                     }
+                 },
+                 clearFile() {
+                     this.fileName = '';
+                     this.fileSize = '';
+                     this.fileExt = '';
+                     this.$refs.fileInput.value = '';
+                 }
+             }">
             <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#1E2638]">
-                <h3 class="font-bold text-slate-900 dark:text-white text-sm">Thêm tài liệu ôn tập</h3>
+                <div class="flex items-center space-x-2">
+                    <div class="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center text-blue-600">
+                        <i data-lucide="upload-cloud" class="w-4 h-4"></i>
+                    </div>
+                    <h3 class="font-bold text-slate-900 dark:text-white text-sm">Thêm tài liệu ôn tập</h3>
+                </div>
                 <button @click="materialModal = false" class="text-slate-400 hover:text-slate-700 dark:hover:text-white p-1 rounded-lg"><i data-lucide="x" class="w-4 h-4"></i></button>
             </div>
-            <form method="POST" action="{% url 'material_create' %}" class="space-y-3 text-xs">
+
+            <form method="POST" action="{% url 'material_create' %}" enctype="multipart/form-data" class="space-y-4 text-xs">
                 {% csrf_token %}
+
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Môn học</label>
                     <select name="course_id" class="w-full px-3 py-2 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-slate-900 dark:text-white focus:border-blue-500 focus:outline-none">
@@ -289,29 +409,89 @@
                         {% endfor %}
                     </select>
                 </div>
+
+                <!-- Khu vực kéo thả file (Drag & Drop Zone) -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
+                        <span>Kéo thả tệp tài liệu (PDF, Word, PPTX, Ảnh...)</span>
+                        <span class="text-[11px] font-normal text-slate-400">Tối đa 25MB</span>
+                    </label>
+
+                    <div @dragover.prevent="dragOver = true"
+                         @dragleave.prevent="dragOver = false"
+                         @drop.prevent="onDrop($event)"
+                         @click="$refs.fileInput.click()"
+                         :class="dragOver ? 'border-blue-500 bg-blue-50/60 dark:bg-blue-500/15 ring-2 ring-blue-500/20' : 'border-slate-300 dark:border-[#283248] hover:border-blue-400 dark:hover:border-blue-500 bg-slate-50/60 dark:bg-[#0B0F17]'"
+                         class="relative border-2 border-dashed rounded-2xl p-4 sm:p-5 text-center cursor-pointer transition-all duration-200 group">
+                        
+                        <input type="file" x-ref="fileInput" name="file" @change="handleFiles($event.target.files)" class="hidden">
+                        
+                        <!-- Khi chưa chọn file -->
+                        <div x-show="!fileName" class="space-y-2 py-1">
+                            <div class="w-12 h-12 mx-auto rounded-2xl bg-blue-50 dark:bg-blue-500/10 group-hover:bg-blue-100 dark:group-hover:bg-blue-500/20 text-blue-600 flex items-center justify-center transition-colors">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="font-semibold text-xs text-slate-800 dark:text-slate-200">
+                                    Kéo thả tệp vào đây, hoặc <span class="text-blue-600 underline">chọn từ thiết bị</span>
+                                </p>
+                                <p class="text-[11px] text-slate-400 mt-0.5">
+                                    Hỗ trợ .pdf, .docx, .pptx, .xlsx, .zip, hình ảnh
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Khi đã chọn/kéo file vào -->
+                        <div x-show="fileName" class="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-[#1A2234] border border-blue-200 dark:border-blue-500/30 shadow-xs" @click.stop style="display: none;">
+                            <div class="flex items-center space-x-3 min-w-0">
+                                <div class="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-xs uppercase shrink-0" x-text="fileExt || 'TỆP'"></div>
+                                <div class="text-left min-w-0">
+                                    <p class="font-semibold text-xs text-slate-900 dark:text-white truncate" x-text="fileName"></p>
+                                    <p class="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5" x-text="fileSize"></p>
+                                </div>
+                            </div>
+                            <button type="button" @click="clearFile()" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors" title="Bỏ chọn tệp">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Tiêu đề tài liệu</label>
-                    <input name="title" type="text" required placeholder="Slide bài giảng, Ghi chú..." class="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-slate-900 dark:text-white focus:border-blue-500 focus:outline-none">
+                    <input id="material-title-input" name="title" type="text" required placeholder="Slide bài giảng, Ghi chú ôn thi..." class="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-slate-900 dark:text-white focus:border-blue-500 focus:outline-none">
                 </div>
+
+                <div class="grid grid-cols-2 gap-2.5">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Loại tài liệu</label>
+                        <select name="material_type" x-model="selectedType" class="w-full px-3 py-2 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-slate-900 dark:text-white focus:border-blue-500 focus:outline-none">
+                            <option value="FILE">Tệp tin đính kèm</option>
+                            <option value="LINK">Đường dẫn URL</option>
+                            <option value="NOTE">Ghi chú</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Đường link URL (nếu có)</label>
+                        <input name="url" type="url" placeholder="https://..." class="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-slate-900 dark:text-white focus:border-blue-500 focus:outline-none">
+                    </div>
+                </div>
+
                 <div>
-                    <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Loại tài liệu</label>
-                    <select name="material_type" class="w-full px-3 py-2 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-slate-900 dark:text-white focus:border-blue-500 focus:outline-none">
-                        <option value="NOTE">Ghi chú</option>
-                        <option value="LINK">Đường dẫn URL</option>
-                        <option value="FILE">Tệp tin đính kèm</option>
-                    </select>
+                    <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Nội dung ghi chú / Tóm tắt</label>
+                    <textarea name="content" rows="2" placeholder="Ghi chú tóm tắt nội dung chính hoặc dặn dò ôn thi..." class="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-slate-900 dark:text-white focus:border-blue-500 focus:outline-none"></textarea>
                 </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Đường link (URL nếu có)</label>
-                    <input name="url" type="url" placeholder="https://..." class="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-slate-900 dark:text-white focus:border-blue-500 focus:outline-none">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Nội dung tóm tắt</label>
-                    <textarea name="content" rows="2" class="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-slate-900 dark:text-white focus:border-blue-500 focus:outline-none"></textarea>
-                </div>
-                <div class="flex justify-end space-x-2 pt-1">
+
+                <div class="flex justify-end space-x-2 pt-2 border-t border-slate-100 dark:border-[#1E2638]">
                     <button type="button" @click="materialModal = false" class="px-4 py-2 text-xs font-medium text-slate-500 hover:text-slate-900 dark:hover:text-white">Hủy</button>
-                    <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition-colors shadow-xs">Lưu tài liệu</button>
+                    <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition-colors shadow-xs flex items-center space-x-1.5">
+                        <i data-lucide="check" class="w-3.5 h-3.5"></i>
+                        <span>Lưu tài liệu</span>
+                    </button>
                 </div>
             </form>
         </div>
