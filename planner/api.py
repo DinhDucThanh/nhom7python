@@ -130,6 +130,7 @@ def get_calendar_events(
             "textColor": "#FFFFFF",
             "editable": True,
             "durationEditable": True,
+            "classNames": ["fc-study-block"],
             "extendedProps": {
                 "type": "study_block",
                 "course_name": course.name if course else "",
