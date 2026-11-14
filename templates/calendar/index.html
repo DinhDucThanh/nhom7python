@@ -179,11 +179,27 @@
                         center: 'title',
                         right: 'timeGridWeek,timeGridDay,dayGridMonth'
                     },
+                    buttonText: {
+                        today: 'Hôm nay',
+                        timeGridWeek: 'Tuần',
+                        timeGridDay: 'Ngày',
+                        dayGridMonth: 'Tháng'
+                    },
                     locale: 'vi',
                     firstDay: 1, // Thứ hai
-                    slotMinTime: '06:00:00',
-                    slotMaxTime: '23:30:00',
+                    slotMinTime: '07:00:00',
+                    slotMaxTime: '22:30:00',
                     slotDuration: '00:30:00',
+                    slotLabelFormat: {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false
+                    },
+                    eventTimeFormat: {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false
+                    },
                     allDaySlot: false,
                     expandRows: true,
                     nowIndicator: true,

@@ -168,17 +168,34 @@ def get_calendar_events(
                 }
                 icon = cat_icons.get(bs.category, "🔒")
 
+                # Tùy biến màu sắc và độ tương phản cao cho từng danh mục lịch bận
+                if bs.category == BusySlot.CATEGORY_CLASS:
+                    bg_color = "#EEF2FF"
+                    border_color = "#6366F1"
+                    text_color = "#1E1B4B"
+                    slot_class = "fc-busy-class"
+                elif bs.category == BusySlot.CATEGORY_JOB:
+                    bg_color = "#FFF1F2"
+                    border_color = "#F43F5E"
+                    text_color = "#881337"
+                    slot_class = "fc-busy-job"
+                else:
+                    bg_color = "#F8FAFC"
+                    border_color = "#64748B"
+                    text_color = "#0F172A"
+                    slot_class = "fc-busy-personal"
+
                 events.append({
                     "id": f"busy_{bs.id}_{cur_date}",
                     "title": f"{icon} {bs.title}",
                     "start": start_dt.isoformat(),
                     "end": end_dt.isoformat(),
-                    "backgroundColor": bs.color_code or "#64748B",
-                    "borderColor": bs.color_code or "#475569",
-                    "textColor": "#FFFFFF",
+                    "backgroundColor": bg_color,
+                    "borderColor": border_color,
+                    "textColor": text_color,
                     "editable": False,
                     "durationEditable": False,
-                    "classNames": ["fc-busy-slot"],
+                    "classNames": ["fc-busy-slot", slot_class],
                     "extendedProps": {
                         "type": "busy_slot",
                         "category": bs.get_category_display(),

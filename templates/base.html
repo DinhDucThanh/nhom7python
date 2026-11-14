@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Lập Kế Hoạch Học Tập & Tối Ưu Lịch — StudyPlanner{% endblock %}</title>
 
-    <!-- Google Font: Be Vietnam Pro (Thiết kế chuẩn hóa hiển thị tiếng Việt & Typographic Hierarchy) -->
+    <!-- Google Fonts: Plus Jakarta Sans (Headings, Numbers, UI) + Be Vietnam Pro (Vietnamese Diacritics) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -18,7 +18,9 @@
             theme: {
                 extend: {
                     fontFamily: {
-                        sans: ['"Be Vietnam Pro"', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+                        sans: ['"Plus Jakarta Sans"', '"Be Vietnam Pro"', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+                        heading: ['"Plus Jakarta Sans"', '-apple-system', 'sans-serif'],
+                        body: ['"Be Vietnam Pro"', '-apple-system', 'sans-serif'],
                         mono: ['"JetBrains Mono"', 'monospace'],
                     },
                     colors: {
@@ -26,9 +28,11 @@
                             50: '#eff6ff',
                             100: '#dbeafe',
                             200: '#bfdbfe',
+                            400: '#60a5fa',
                             500: '#3b82f6',
                             600: '#2563eb',
                             700: '#1d4ed8',
+                            800: '#1e40af',
                         }
                     }
                 }
@@ -99,18 +103,27 @@
         }
 
         body {
-            font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: 'Plus Jakarta Sans', 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif;
             background-color: var(--app-bg);
             color: var(--text-body);
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            text-rendering: optimizeLegibility;
             transition: background-color 0.2s ease, color 0.2s ease;
         }
 
-        /* FullCalendar Tinh giản & Tự nhiên */
+        h1, h2, h3, h4, .font-heading, .fc-toolbar-title {
+            font-family: 'Plus Jakarta Sans', sans-serif !important;
+            letter-spacing: -0.02em;
+        }
+
+        /* FullCalendar Tinh giản, Đậm đà, Sắc nét */
         .fc {
             --fc-border-color: var(--fc-border-color);
             --fc-page-bg-color: var(--fc-page-bg-color);
             --fc-today-bg-color: var(--fc-today-bg-color);
             --fc-now-indicator-color: #2563EB;
+            font-family: inherit;
         }
 
         .fc .fc-toolbar {
@@ -120,10 +133,10 @@
         }
 
         .fc .fc-toolbar-title {
-            font-size: 1.15rem !important;
-            font-weight: 700 !important;
+            font-size: 1.2rem !important;
+            font-weight: 800 !important;
             color: var(--text-heading) !important;
-            letter-spacing: -0.015em;
+            letter-spacing: -0.025em;
         }
 
         /* Nút điều hướng lịch tuần tự nhiên */
@@ -132,9 +145,9 @@
             border-color: var(--card-border) !important;
             color: var(--text-body) !important;
             border-radius: 0.75rem !important;
-            font-weight: 600 !important;
+            font-weight: 700 !important;
             font-size: 0.8125rem !important;
-            padding: 0.45rem 0.85rem !important;
+            padding: 0.45rem 0.95rem !important;
             text-transform: none !important;
             box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
             transition: all 0.15s ease-in-out;
@@ -163,27 +176,28 @@
 
         .fc-col-header-cell {
             background-color: var(--app-bg) !important;
-            padding: 8px 0 !important;
+            padding: 10px 0 !important;
             border-bottom: 2px solid var(--fc-border-color) !important;
         }
 
         .fc-col-header-cell-cushion {
-            font-size: 12px !important;
-            font-weight: 600 !important;
-            color: var(--text-muted) !important;
+            font-size: 13px !important;
+            font-weight: 700 !important;
+            color: var(--text-heading) !important;
             text-transform: none !important;
-            letter-spacing: normal !important;
+            letter-spacing: -0.01em !important;
         }
 
         .fc-timegrid-slot-label-cushion {
             font-size: 11px !important;
-            font-weight: 500 !important;
+            font-weight: 600 !important;
             color: var(--text-muted) !important;
             font-variant-numeric: tabular-nums;
+            letter-spacing: -0.01em;
         }
 
         .fc-timegrid-slot {
-            height: 2.35rem !important;
+            height: 2.5rem !important;
         }
 
         .fc-now-indicator-line {
@@ -195,54 +209,121 @@
             border-color: #2563EB !important;
         }
 
-        /* Thẻ sự kiện học tập trên lịch */
+        /* Thẻ sự kiện học tập trên lịch: Bo góc, Tương phản cao, Chữ sắc nét */
         .fc-event {
-            border-radius: 10px !important;
-            padding: 3px 6px !important;
+            border-radius: 8px !important;
+            padding: 4px 6px !important;
             cursor: pointer;
-            border: 1px solid rgba(0, 0, 0, 0.06) !important;
-            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05) !important;
+            border-width: 1px !important;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
             transition: transform 0.15s ease, box-shadow 0.15s ease;
         }
 
         html.dark .fc-event {
-            border: 1px solid rgba(255, 255, 255, 0.08) !important;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4) !important;
         }
 
         .fc-event:hover {
             transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
         }
 
         .fc-event-main {
-            font-size: 11.5px !important;
+            font-size: 12px !important;
             font-weight: 600 !important;
             line-height: 1.35 !important;
         }
 
-        .fc-busy-slot {
-            background: repeating-linear-gradient(
-                -45deg,
-                #F1F5F9,
-                #F1F5F9 8px,
-                #E2E8F0 8px,
-                #E2E8F0 16px
-            ) !important;
-            border-left: 4px solid #64748B !important;
-            color: #334155 !important;
+        .fc-event-title {
+            font-weight: 700 !important;
+            font-size: 12px !important;
         }
 
-        html.dark .fc-busy-slot {
-            background: repeating-linear-gradient(
-                -45deg,
-                #131926,
-                #131926 8px,
-                #1A2234 8px,
-                #1A2234 16px
-            ) !important;
-            border-left: 4px solid #475569 !important;
-            color: #CBD5E1 !important;
+        .fc-event-time {
+            font-size: 10.5px !important;
+            font-weight: 600 !important;
+            opacity: 0.85 !important;
+            font-variant-numeric: tabular-nums;
+            margin-bottom: 2px !important;
+        }
+
+        /* Lịch bận cố định: Rõ ràng, Tương phản cao, Khắc phục hoàn toàn lỗi chữ trắng nền xám */
+        .fc-busy-slot {
+            border-left-width: 4px !important;
+            font-weight: 600 !important;
+        }
+
+        /* Lớp học trường: Nền Indigo nhạt, Chữ xanh đậm sắc sảo */
+        .fc-busy-class {
+            background-color: #EEF2FF !important;
+            border-color: #6366F1 !important;
+            color: #1E1B4B !important;
+        }
+        .fc-busy-class .fc-event-main,
+        .fc-busy-class .fc-event-title,
+        .fc-busy-class .fc-event-time {
+            color: #1E1B4B !important;
+            font-weight: 700 !important;
+        }
+
+        /* Ca làm thêm: Nền Rose nhạt, Chữ đỏ sẫm sang trọng */
+        .fc-busy-job {
+            background-color: #FFF1F2 !important;
+            border-color: #F43F5E !important;
+            color: #881337 !important;
+        }
+        .fc-busy-job .fc-event-main,
+        .fc-busy-job .fc-event-title,
+        .fc-busy-job .fc-event-time {
+            color: #881337 !important;
+            font-weight: 700 !important;
+        }
+
+        /* Hoạt động cá nhân: Nền Slate nhạt, Chữ than chì đậm */
+        .fc-busy-personal {
+            background-color: #F1F5F9 !important;
+            border-color: #64748B !important;
+            color: #0F172A !important;
+        }
+        .fc-busy-personal .fc-event-main,
+        .fc-busy-personal .fc-event-title,
+        .fc-busy-personal .fc-event-time {
+            color: #0F172A !important;
+            font-weight: 700 !important;
+        }
+
+        /* Chế độ Dark Mode cho Busy Slots */
+        html.dark .fc-busy-class {
+            background-color: #1E1B4B !important;
+            border-color: #818CF8 !important;
+            color: #E0E7FF !important;
+        }
+        html.dark .fc-busy-class .fc-event-main,
+        html.dark .fc-busy-class .fc-event-title,
+        html.dark .fc-busy-class .fc-event-time {
+            color: #E0E7FF !important;
+        }
+
+        html.dark .fc-busy-job {
+            background-color: #4C0519 !important;
+            border-color: #FB7185 !important;
+            color: #FFE4E6 !important;
+        }
+        html.dark .fc-busy-job .fc-event-main,
+        html.dark .fc-busy-job .fc-event-title,
+        html.dark .fc-busy-job .fc-event-time {
+            color: #FFE4E6 !important;
+        }
+
+        html.dark .fc-busy-personal {
+            background-color: #1E293B !important;
+            border-color: #94A3B8 !important;
+            color: #F8FAFC !important;
+        }
+        html.dark .fc-busy-personal .fc-event-main,
+        html.dark .fc-busy-personal .fc-event-title,
+        html.dark .fc-busy-personal .fc-event-time {
+            color: #F8FAFC !important;
         }
 
         /* Thanh cuộn tinh tế */
@@ -403,15 +484,15 @@
     </header>
     {% endif %}
 
-    <!-- THÔNG BÁO FLASH MESSAGE -->
+    <!-- THÔNG BÁO FLASH MESSAGE: FLOATING TOAST TINH TẾ -->
     {% if messages %}
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 w-full">
+    <div class="fixed top-20 right-6 z-50 flex flex-col space-y-2.5 max-w-sm pointer-events-auto" x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 4500)">
         {% for message in messages %}
-        <div class="flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-medium shadow-xs transition-all mb-2.5
-                    {% if message.tags == 'error' %}bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-500/25
-                    {% elif message.tags == 'warning' %}bg-amber-50 dark:bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/25
-                    {% elif message.tags == 'success' %}bg-emerald-50 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/25
-                    {% else %}bg-blue-50 dark:bg-blue-500/10 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-500/25{% endif %}">
+        <div class="flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-semibold shadow-xl border backdrop-blur-md transition-all
+                    {% if message.tags == 'error' %}bg-rose-50/95 dark:bg-rose-950/90 text-rose-800 dark:text-rose-200 border-rose-200 dark:border-rose-800
+                    {% elif message.tags == 'warning' %}bg-amber-50/95 dark:bg-amber-950/90 text-amber-800 dark:text-amber-200 border-amber-200 dark:border-amber-800
+                    {% elif message.tags == 'success' %}bg-emerald-50/95 dark:bg-emerald-950/90 text-emerald-800 dark:text-emerald-200 border-emerald-200 dark:border-emerald-800
+                    {% else %}bg-blue-50/95 dark:bg-blue-950/90 text-blue-800 dark:text-blue-200 border-blue-200 dark:border-blue-800{% endif %}">
             <div class="flex items-center space-x-2.5">
                 {% if message.tags == 'error' %}<i data-lucide="alert-circle" class="w-4 h-4 text-rose-500"></i>
                 {% elif message.tags == 'warning' %}<i data-lucide="alert-triangle" class="w-4 h-4 text-amber-500"></i>
@@ -419,6 +500,7 @@
                 {% else %}<i data-lucide="info" class="w-4 h-4 text-blue-500"></i>{% endif %}
                 <span>{{ message }}</span>
             </div>
+            <button @click="show = false" class="ml-3 text-slate-400 hover:text-slate-700 dark:hover:text-white p-0.5"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
         </div>
         {% endfor %}
     </div>

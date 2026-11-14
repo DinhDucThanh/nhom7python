@@ -45,4 +45,5 @@ celerybeat.pid
 .DS_Store
 cloudflared.exe
 *.bat
+~$*.docx
 

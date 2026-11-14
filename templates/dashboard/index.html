@@ -131,8 +131,9 @@
                         <input type="datetime-local" name="deadline" required
                                class="w-full px-2.5 py-2 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-[#232B3E] rounded-xl text-xs font-mono text-slate-600 dark:text-slate-400 focus:border-blue-500 focus:outline-none">
                         <input type="hidden" name="estimated_minutes" value="60">
-                        <button type="submit" class="px-4 py-2 bg-slate-900 dark:bg-[#1E2638] hover:bg-slate-800 text-white rounded-xl text-xs font-semibold transition-colors flex-shrink-0">
-                            Lưu việc
+                        <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm hover:shadow active:scale-95 flex-shrink-0 flex items-center space-x-1.5">
+                            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                            <span>Lưu việc</span>
                         </button>
                     </div>
                 </form>
@@ -410,11 +411,26 @@
                         center: 'title',
                         right: 'timeGridWeek,timeGridDay'
                     },
+                    buttonText: {
+                        today: 'Hôm nay',
+                        timeGridWeek: 'Tuần',
+                        timeGridDay: 'Ngày'
+                    },
                     locale: 'vi',
                     firstDay: 1, // Thứ Hai
                     slotMinTime: '07:00:00',
                     slotMaxTime: '22:30:00',
                     slotDuration: '00:30:00',
+                    slotLabelFormat: {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false
+                    },
+                    eventTimeFormat: {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false
+                    },
                     allDaySlot: false,
                     expandRows: true,
                     nowIndicator: true,
