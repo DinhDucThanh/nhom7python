@@ -7,6 +7,7 @@ urlpatterns = [
     path('register/', views.register_view, name='register'),
     path('logout/', views.logout_view, name='logout'),
     path('profile/', views.profile_view, name='profile'),
+    path('account-locked/', views.account_locked_view, name='account_locked'),
 
     # Core
     path('', views.dashboard_view, name='dashboard'),

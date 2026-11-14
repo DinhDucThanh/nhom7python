@@ -84,6 +84,22 @@ class StudyMaterial(models.Model):
             return os.path.splitext(self.file.name)[1].lower().replace('.', '')
         return ""
 
+    @property
+    def is_image(self):
+        return self.file_extension in ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg']
+
+    @property
+    def is_pdf(self):
+        return self.file_extension == 'pdf'
+
+    @property
+    def is_text(self):
+        return self.file_extension in ['txt', 'md', 'py', 'json', 'csv', 'log', 'html', 'css', 'js']
+
+    @property
+    def is_office(self):
+        return self.file_extension in ['doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx']
+
 
 class BusySlot(models.Model):
     CATEGORY_CLASS = 'CLASS'

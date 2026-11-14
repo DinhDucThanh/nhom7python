@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+
+{% block title %}Tài khoản bị khóa — StudyPlanner AI{% endblock %}
+
+{% block content %}
+<div class="min-h-[75vh] flex flex-col justify-center items-center py-10 px-4 sm:px-6 lg:px-8">
+    
+    <div class="max-w-md w-full text-center space-y-6">
+        
+        <!-- Biểu tượng Ổ Khóa lớn nổi bật -->
+        <div class="relative mx-auto w-24 h-24 flex items-center justify-center">
+            <!-- Vòng tròn hiệu ứng sóng lan tỏa -->
+            <div class="absolute inset-0 rounded-full bg-rose-500/20 dark:bg-rose-500/10 animate-ping opacity-75"></div>
+            <div class="absolute inset-2 rounded-full bg-rose-100 dark:bg-rose-500/20"></div>
+            <div class="relative w-16 h-16 rounded-2xl bg-gradient-to-tr from-rose-600 to-rose-500 flex items-center justify-center text-white shadow-xl shadow-rose-500/30">
+                <i data-lucide="lock" class="w-8 h-8"></i>
+            </div>
+        </div>
+
+        <!-- Tiêu đề & Thông báo chính -->
+        <div class="space-y-2">
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-500/30">
+                <i data-lucide="shield-alert" class="w-3.5 h-3.5 mr-1.5"></i> Quyền truy cập bị tạm khóa
+            </span>
+            <h1 class="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                Tài khoản của bạn đã bị khóa
+            </h1>
+            <p class="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto leading-relaxed">
+                Tài khoản học sinh của bạn hiện đã bị Quản trị viên tạm khóa quyền truy cập lịch học, tài liệu và các tính năng xếp lịch.
+            </p>
+        </div>
+
+        <!-- Khung chi tiết tài khoản -->
+        <div class="bg-white dark:bg-[#131926] p-5 rounded-3xl border border-slate-200/80 dark:border-[#232B3E] shadow-sm text-left space-y-3.5">
+            <div class="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider pb-2 border-b border-slate-100 dark:border-[#1E2638] flex items-center justify-between">
+                <span>Thông tin tài khoản</span>
+                <span class="text-rose-500 font-semibold flex items-center">
+                    <span class="w-2 h-2 rounded-full bg-rose-500 mr-1.5 animate-pulse"></span> Bị vô hiệu hóa
+                </span>
+            </div>
+
+            <div class="space-y-2 text-xs">
+                <div class="flex justify-between items-center">
+                    <span class="text-slate-500 dark:text-slate-400">Họ và tên:</span>
+                    <span class="font-bold text-slate-900 dark:text-white">
+                        {{ locked_user.get_full_name|default:locked_user.username }}
+                    </span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-slate-500 dark:text-slate-400">Tên đăng nhập:</span>
+                    <span class="font-mono font-medium text-slate-800 dark:text-slate-200 bg-slate-100 dark:bg-[#1A2234] px-2 py-0.5 rounded">
+                        {{ locked_user.username }}
+                    </span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-slate-500 dark:text-slate-400">Vai trò:</span>
+                    <span class="font-medium text-slate-700 dark:text-slate-300">
+                        {{ locked_user.get_role_display }}
+                    </span>
+                </div>
+            </div>
+
+            <!-- Ghi chú giải thích -->
+            <div class="p-3 rounded-2xl bg-slate-50 dark:bg-[#0B0F17] border border-slate-100 dark:border-[#1E2638] text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed space-y-1">
+                <p class="font-semibold text-slate-800 dark:text-slate-200 flex items-center">
+                    <i data-lucide="info" class="w-3.5 h-3.5 mr-1 text-blue-500"></i> Hướng dẫn xử lý:
+                </p>
+                <p>
+                    Nếu đây là sự nhầm lẫn hoặc bạn cần tiếp tục sử dụng hệ thống để ôn tập thi cử, vui lòng liên hệ trực tiếp với Giảng viên phụ trách hoặc Ban quản trị hệ thống để được hỗ trợ kích hoạt lại.
+                </p>
+            </div>
+        </div>
+
+        <!-- Các nút thao tác -->
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <button onclick="window.location.reload()" 
+                    class="w-full sm:w-auto inline-flex items-center justify-center space-x-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition-all shadow-sm active:scale-95">
+                <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                <span>Kiểm tra lại (Tải lại trang)</span>
+            </button>
+
+            <a href="{% url 'logout' %}" 
+               class="w-full sm:w-auto inline-flex items-center justify-center space-x-2 px-5 py-2.5 rounded-xl bg-slate-100 dark:bg-[#1E2638] hover:bg-slate-200 dark:hover:bg-[#283248] text-slate-700 dark:text-slate-300 font-semibold text-xs transition-all active:scale-95 border border-slate-200/80 dark:border-[#283248]">
+                <i data-lucide="log-out" class="w-4 h-4 text-rose-500"></i>
+                <span>Đăng xuất</span>
+            </a>
+        </div>
+
+    </div>
+
+</div>
+{% endblock %}

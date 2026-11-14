@@ -20,21 +20,32 @@ from .ai_service import AIService
 # =============================================================================
 def login_view(request):
     if request.user.is_authenticated:
+        if not request.user.is_active:
+            return redirect('account_locked')
         return redirect('dashboard')
     if request.method == 'POST':
         u = request.POST.get('username', '').strip()
         p = request.POST.get('password', '').strip()
         user = authenticate(request, username=u, password=p)
         if user is not None:
-            if not user.is_active:
-                messages.error(request, "Tài khoản của bạn đã bị khóa. Vui lòng liên hệ Admin.")
-                return render(request, 'auth/login.html')
             login(request, user)
+            if not user.is_active:
+                return redirect('account_locked')
             messages.success(request, f"Chào mừng {user.first_name or user.username} quay trở lại!")
             return redirect('dashboard')
         else:
             messages.error(request, "Tên đăng nhập hoặc mật khẩu không chính xác.")
     return render(request, 'auth/login.html')
+
+
+def account_locked_view(request):
+    if not request.user.is_authenticated:
+        return redirect('login')
+    if request.user.is_active:
+        return redirect('dashboard')
+    return render(request, 'auth/account_locked.html', {
+        'locked_user': request.user
+    })
 
 
 def register_view(request):

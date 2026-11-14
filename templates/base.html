@@ -368,6 +368,7 @@
                     </a>
 
                     <!-- Danh mục chức năng (Dùng câu chữ tự nhiên, không All-caps) -->
+                    {% if user.is_active %}
                     <nav class="hidden md:flex items-center space-x-1">
                         <a href="{% url 'dashboard' %}" 
                            class="flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all {% if request.path == '/' or request.path == '/calendar/' %}bg-slate-100 dark:bg-[#1E2638] text-blue-600 dark:text-white{% else %}text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#1A2234]{% endif %}">
@@ -395,11 +396,13 @@
                         </a>
                         {% endif %}
                     </nav>
+                    {% endif %}
                 </div>
 
                 <!-- Thanh tác vụ bên phải -->
                 <div class="flex items-center space-x-3">
                     
+                    {% if user.is_active %}
                     <!-- Nút hành động chính duy nhất: Tự động xếp lịch -->
                     <a href="{% url 'trigger_optimizer' %}" 
                        title="Sắp xếp thông minh các phiên học vào khoảng trống trong tuần"
@@ -407,6 +410,7 @@
                         <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-300"></i>
                         <span>Tự động xếp lịch</span>
                     </a>
+                    {% endif %}
 
                     <!-- Nút chuyển đổi Giao diện Sáng / Tối (☀️ / 🌙) -->
                     <button id="themeToggleBtn" onclick="toggleTheme()" 
@@ -416,6 +420,7 @@
                         <i data-lucide="moon" class="w-4 h-4 block dark:hidden text-slate-600"></i>
                     </button>
 
+                    {% if user.is_active %}
                     <!-- Hộp thông báo -->
                     <div class="relative" x-data="{ open: false }">
                         <button @click="open = !open" 
@@ -476,6 +481,14 @@
                             </a>
                         </div>
                     </div>
+                    {% else %}
+                    <!-- Nút Đăng xuất trực tiếp cho tài khoản bị khóa -->
+                    <a href="{% url 'logout' %}" 
+                       class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 text-xs font-semibold hover:bg-rose-100 transition-colors">
+                        <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+                        <span>Đăng xuất</span>
+                    </a>
+                    {% endif %}
 
                 </div>
 
